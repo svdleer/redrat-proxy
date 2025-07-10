@@ -1,7 +1,13 @@
 import bcrypt
 from functools import wraps
 from flask import request, jsonify, redirect, url_for
-from mysql_db import db
+# Fix imports to work both in local development and in Docker
+try:
+    # Try local import first (when running as a module)
+    from app.mysql_db import db
+except ImportError:
+    # Fall back to relative import (when importing within the package)
+    from .mysql_db import db
 from datetime import datetime, timedelta
 
 def hash_password(password):

@@ -38,7 +38,8 @@ RUN . venv/bin/activate && pip list
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Use the virtual environment's Python and Gunicorn
-CMD ["./venv/bin/gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--log-level", "debug", "--chdir", "/app", "app:app"]
+# Run the application using the top-level app.py file
+CMD ["/app/venv/bin/python", "app.py"]

@@ -1,6 +1,13 @@
 from flask import Flask, request, jsonify, send_from_directory, render_template
-from .auth import hash_password, verify_password, login_required
-from .mysql_db import db
+# Fix imports to work both in local development and in Docker
+try:
+    # Try local import first (when running as a module)
+    from app.auth import hash_password, verify_password, login_required
+    from app.mysql_db import db
+except ImportError:
+    # Fall back to relative import (when importing within the package)
+    from .auth import hash_password, verify_password, login_required
+    from .mysql_db import db
 import uuid
 import os
 from datetime import datetime, timedelta

@@ -1,8 +1,23 @@
 import os
+import sys
 from flask import Flask
 from flask_socketio import SocketIO
-from .mysql_db import db  # Import the database instance
-from .config import Config
+
+# Add the parent directory to sys.path if needed
+app_dir = os.path.abspath(os.path.dirname(__file__))
+if app_dir not in sys.path:
+    sys.path.insert(0, os.path.dirname(app_dir))
+
+# Import the database instance
+try:
+    from .mysql_db import db
+except ImportError:
+    from app.mysql_db import db
+
+try:
+    from .config import Config
+except ImportError:
+    from app.config import Config
 
 # Create extensions instances
 socketio = SocketIO()

@@ -8,8 +8,12 @@ services:
     build: .
     env_file: .env
     volumes:
-      - ./app:/app/app
-      - ./app.py:/app/app.py  # Add the root app.py file
+      # Mount code and config files
+      - ./app:/app/app  # The app package
+      - ./app.py:/app/app.py  # The main entry point
+      - ./requirements.txt:/app/requirements.txt  # Dependencies
+      
+      # Mount data directories
       - ./data/uploads:/app/app/static/uploads  # For persistent uploads
       - ./data/remote_images:/app/app/static/remote_images  # For remote images
     ports:
@@ -22,4 +26,5 @@ services:
       - MYSQL_USER=${MYSQL_USER:-redrat}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-redratpass}
       - MYSQL_DB=${MYSQL_DB:-redrat}
+      - PYTHONPATH=/app
     restart: unless-stopped
