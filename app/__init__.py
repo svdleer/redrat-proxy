@@ -1,41 +1,35 @@
+import os
 from flask import Flask
 from flask_socketio import SocketIO
-from app.config import Config
-from app.utils.logger import setup_logger
-from flask import Flask
-from werkzeug.middleware.proxy_fix import ProxyFix
+from .mysql_db import db  # Import the database instance
+from .config import Config
 
-# Initialize extensions
+# Create extensions instances
 socketio = SocketIO()
-logger = setup_logger(__name__)
 
 def create_app():
-    app = Flask(__name__)
-    
-    # Configure for reverse proxy
-    app.wsgi_app = ProxyFix(
-        app.wsgi_app,
-        x_for=1,
-        x_proto=1,
-        x_host=1,
-        x_prefix=1
-    )
-
-    """Application factory"""
+    """Application factory function"""
     app = Flask(__name__)
     app.config.from_object(Config)
     
     # Initialize extensions
+    db.init_app(app)  # If your MySQLDatabase class has init_app method
     socketio.init_app(app)
     
-    # Register blueprints
-    from app.routes import main_bp, api_bp, admin_bp
+    # Import and register blueprints
+    from .routes import main_bp, api_bp, admin_bp
     app.register_blueprint(main_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(admin_bp, url_prefix='/admin')
     
-    # Error handlers
-    from app.errors import init_error_handlers
+    # Import and register error handlers
+    from .errors import init_error_handlers
     init_error_handlers(app)
     
+    # Ensure upload folder exists
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    
     return app
+
+# Make these available when importing from package
+__all__ = ['create_app', 'db', 'socketio']
