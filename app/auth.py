@@ -1,7 +1,7 @@
 import bcrypt
 from functools import wraps
 from flask import request, jsonify
-from app.mysql_db import db
+from mysql_db import db
 from datetime import datetime, timedelta
 
 def hash_password(password):
