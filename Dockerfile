@@ -5,6 +5,8 @@ RUN apt-get update && \
     gcc python3-dev libmariadb-dev-compat libmariadb-dev libjpeg-dev zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
+    RUN pip install --upgrade pip
+
 WORKDIR /app
 
 COPY requirements.txt .
