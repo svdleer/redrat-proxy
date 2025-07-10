@@ -6,39 +6,10 @@ services:
     env_file: .env
     volumes:
       - ./app:/app
-      - redrat_uploads:/app/static/uploads
+      - ./data/uploads:/app/static/uploads  # For persistent uploads
     ports:
-      - "5000:5000"
-    depends_on:
-      - db
-      - redrat-device
-
-  db:
-    image: mysql:8.0
-    env_file: .env
-    volumes:
-      - mysql_data:/var/lib/mysql
+      - "127.0.0.1:5000:5000"  # Only expose to localhost
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # For host MySQL access
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DB}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-
-  apache:
-    image: httpd:2.4
-    ports:
-      - "80:80"
-    volumes:
-      - ./apache/redrat.conf:/usr/local/apache2/conf/extra/redrat.conf
-      - redrat_uploads:/usr/local/apache2/htdocs/uploads
-    depends_on:
-      - web
-
-  redrat-device:
-    image: custom-redrat-image
-    ports:
-      - "40000:40000"
-
-volumes:
-  mysql_data:
-  redrat_uploads:
+      - MYSQL_HOST=host.docker.internal
