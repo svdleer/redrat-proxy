@@ -32,7 +32,7 @@ A modern web dashboard for the RedRat IrNetBox - infrared remote control system.
    pip install -r requirements.txt
    ```
 
-4. Initialize the database
+3. Initialize the database
    ```
    # On Windows
    mysql -u username -p < mysql_schema.sql
@@ -42,22 +42,25 @@ A modern web dashboard for the RedRat IrNetBox - infrared remote control system.
    ./init_db.sh
    ```
 
-5. Start the application
+4. Start the application
    ```
-   python -m app.app
+   # On Windows
+   run_dev.bat
+   
+   # On Linux/Mac
+   chmod +x run_dev.sh
+   ./run_dev.sh
    ```
 
-6. Visit `http://localhost:5000/login` in your browser
+5. Visit `http://localhost:5000/login` in your browser
 
 ## Development
 
-### Tailwind CSS Development
+### Docker Virtual Environment
 
-To watch for changes in CSS files during development:
+When running in Docker, the project uses a virtual environment to isolate dependencies. This happens automatically inside the container and requires no action from you.
 
-```
-npm run dev:css
-```
+The local development setup does not require a virtual environment, although you can certainly use one if you prefer.
 
 ### Docker Deployment
 
