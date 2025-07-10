@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold mb-6">Command History</h1>
+    
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left">Remote</th>
+                    <th class="px-6 py-3 text-left">Command</th>
+                    <th class="px-6 py-3 text-left">Device</th>
+                    <th class="px-6 py-3 text-left">Status</th>
+                    <th class="px-6 py-3 text-left">Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cmd in commands %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4">{{ cmd.remote_name }}</td>
+                    <td class="px-6 py-4">{{ cmd.command_name }}</td>
+                    <td class="px-6 py-4">{{ cmd.device_name }}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 rounded-full text-xs 
+                            {% if cmd.status == 'executed' %}bg-green-100 text-green-800
+                            {% elif cmd.status == 'failed' %}bg-red-100 text-red-800
+                            {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                            {{ cmd.status }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">{{ cmd.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
