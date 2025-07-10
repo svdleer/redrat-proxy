@@ -3,6 +3,7 @@ from auth import hash_password, verify_password, login_required
 from mysql_db import db
 import uuid
 import os
+from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -18,6 +19,10 @@ db.init_db()
 @login_required()
 def dashboard(user):
     return render_template('dashboard.html', user=user)
+
+@app.route('/login')
+def login_page():
+    return render_template('login.html')
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -46,6 +51,21 @@ def login():
         'is_admin': user['is_admin']
     }})
     response.set_cookie('session_id', session_id, httponly=True, max_age=604800)
+    return response
+
+@app.route('/logout')
+def logout():
+    session_id = request.cookies.get('session_id')
+    if session_id:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM sessions WHERE session_id = %s", (session_id,))
+            conn.commit()
+    
+    response = jsonify({'success': True})
+    response.delete_cookie('session_id')
+    response.headers['Location'] = '/login'
+    response.status_code = 302
     return response
 
 @app.route('/static/<path:filename>')

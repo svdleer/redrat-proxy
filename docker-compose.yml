@@ -5,11 +5,29 @@ services:
     build: .
     env_file: .env
     volumes:
-      - ./app:/app
-      - ./data/uploads:/app/static/uploads  # For persistent uploads
+      - ./app:/app/app
+      - ./data/uploads:/app/app/static/uploads  # For persistent uploads
+      - ./data/remote_images:/app/app/static/remote_images  # For remote images
     ports:
       - "127.0.0.1:5000:5000"  # Only expose to localhost
     extra_hosts:
       - "host.docker.internal:host-gateway"  # For host MySQL access
     environment:
-      - MYSQL_HOST=host.docker.internal
+      - MYSQL_HOST=host.docker.internal  # Connect to host's MySQL
+      # You may need to adjust these values based on your host MySQL configuration
+      - MYSQL_USER=${MYSQL_USER:-redrat}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-redratpass}
+      - MYSQL_DB=${MYSQL_DB:-redrat}
+    restart: unless-stopped
+
+  apache:
+    image: httpd:2.4
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+    volumes:
+      - ./apache/redrat.conf:/usr/local/apache2/conf/extra/redrat.conf
+      - ./app/static:/var/www/redrat/static
+    command: /bin/bash -c "echo 'Include conf/extra/redrat.conf' >> /usr/local/apache2/conf/httpd.conf && httpd-foreground"
+    restart: unless-stopped

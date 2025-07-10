@@ -1,6 +1,6 @@
 import bcrypt
 from functools import wraps
-from flask import request, jsonify
+from flask import request, jsonify, redirect, url_for
 from mysql_db import db
 from datetime import datetime, timedelta
 
@@ -30,9 +30,10 @@ def login_required(admin_only=False):
         def wrapper(*args, **kwargs):
             user = get_current_user()
             if not user:
-                return jsonify({'error': 'Unauthorized'}), 401
+                return redirect(url_for('login_page'))
             if admin_only and not user['is_admin']:
-                return jsonify({'error': 'Admin access required'}), 403
+                # Redirect to dashboard with an error message
+                return redirect(url_for('dashboard', error="Admin access required"))
             return f(*args, **kwargs, user=user)
         return wrapper
     return decorator

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RedRat Dashboard{% endblock %}</title>
+    <!-- Use Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'redrat': {
+                            50: '#f9fafb',
+                            100: '#f3f4f6',
+                            200: '#e5e7eb',
+                            300: '#d1d5db',
+                            400: '#9ca3af',
+                            500: '#6b7280',
+                            600: '#4b5563',
+                            700: '#374151',
+                            800: '#1f2937',
+                            900: '#111827',
+                        }
+                    }
+                }
+            },
+        }
+    </script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom styles */
+        .btn-primary {
+            background-color: rgb(37, 99, 235);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: rgb(29, 78, 216);
+        }
+        
+        .btn-danger {
+            background-color: rgb(220, 38, 38);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            transition: background-color 0.2s;
+        }
+        .btn-danger:hover {
+            background-color: rgb(185, 28, 28);
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid rgb(209, 213, 219);
+            border-radius: 0.375rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: rgb(59, 130, 246);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+        
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            display: none;
+        }
+        
+        .modal-content {
+            background-color: white;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            width: 100%;
+            max-width: 28rem;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <header class="bg-gradient-to-r from-blue-700 to-blue-900 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center">
+                <img src="/static/images/logo.png" alt="RedRat Logo" class="h-10 w-auto mr-3">
+                <span class="text-xl font-bold">RedRat Dashboard</span>
+            </div>
+            {% if current_user.is_authenticated %}
+            <nav class="hidden md:flex space-x-6">
+                <a href="/" class="hover:text-blue-200 transition {% if request.path == '/' %}font-bold{% endif %}">
+                    <i class="fas fa-tachometer-alt mr-1"></i> Dashboard
+                </a>
+                <a href="/commands" class="hover:text-blue-200 transition {% if request.path == '/commands' %}font-bold{% endif %}">
+                    <i class="fas fa-terminal mr-1"></i> Commands
+                </a>
+                {% if current_user.is_admin %}
+                <a href="/admin/remotes" class="hover:text-blue-200 transition {% if request.path == '/admin/remotes' %}font-bold{% endif %}">
+                    <i class="fas fa-satellite-dish mr-1"></i> Remotes
+                </a>
+                <a href="/admin/users" class="hover:text-blue-200 transition {% if request.path == '/admin/users' %}font-bold{% endif %}">
+                    <i class="fas fa-users mr-1"></i> Users
+                </a>
+                {% endif %}
+            </nav>
+            <div class="flex items-center">
+                <span class="mr-3">{{ current_user.username }}</span>
+                <a href="/logout" class="hover:text-blue-200 transition">
+                    <i class="fas fa-sign-out-alt"></i>
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </header>
+
+    <main class="min-h-screen">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="bg-gray-800 text-white py-4">
+        <div class="container mx-auto px-4 text-center">
+            <p>&copy; {% now "Y" %} RedRat Dashboard. All rights reserved.</p>
+        </div>
+    </footer>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>
