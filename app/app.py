@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, send_from_directory, render_template
-from auth import hash_password, verify_password, login_required
-from mysql_db import db
+from .auth import hash_password, verify_password, login_required
+from .mysql_db import db
 import uuid
 import os
 from datetime import datetime, timedelta

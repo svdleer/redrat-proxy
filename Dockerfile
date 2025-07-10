@@ -23,10 +23,22 @@ RUN . venv/bin/activate && \
 COPY . .
 
 # Ensure proper directories exist with permissions
-RUN mkdir -p /app/static/remote_images && \
-    chmod -R 777 /app/static
+RUN mkdir -p /app/app/static/remote_images && \
+    chmod -R 777 /app/app/static
+
+# Set PYTHONPATH to include the app directory
+ENV PYTHONPATH="/app:${PYTHONPATH}"
 
 EXPOSE 5000
 
+# Verify installed packages for debugging
+RUN . venv/bin/activate && pip list
+
+# Add entrypoint script and make it executable
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+
 # Use the virtual environment's Python and Gunicorn
-CMD ["./venv/bin/gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "app.app:app"]
+CMD ["./venv/bin/gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--log-level", "debug", "--chdir", "/app", "app:app"]

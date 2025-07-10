@@ -9,6 +9,7 @@ services:
     env_file: .env
     volumes:
       - ./app:/app/app
+      - ./app.py:/app/app.py  # Add the root app.py file
       - ./data/uploads:/app/app/static/uploads  # For persistent uploads
       - ./data/remote_images:/app/app/static/remote_images  # For remote images
     ports:
