@@ -10,6 +10,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'static/remote_images'
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # 2MB
+# Configure for reverse proxy on host
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 # Initialize database

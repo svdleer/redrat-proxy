@@ -1,5 +1,8 @@
 version: '3.8'
 
+# Note: This project is designed to be used with a reverse proxy on the Docker host.
+# See the apache/redrat.conf file for an example reverse proxy configuration.
+
 services:
   web:
     build: .
@@ -9,7 +12,7 @@ services:
       - ./data/uploads:/app/app/static/uploads  # For persistent uploads
       - ./data/remote_images:/app/app/static/remote_images  # For remote images
     ports:
-      - "127.0.0.1:5000:5000"  # Only expose to localhost
+      - "127.0.0.1:5000:5000"  # Only expose to localhost - connect to this from your reverse proxy
     extra_hosts:
       - "host.docker.internal:host-gateway"  # For host MySQL access
     environment:
@@ -18,16 +21,4 @@ services:
       - MYSQL_USER=${MYSQL_USER:-redrat}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-redratpass}
       - MYSQL_DB=${MYSQL_DB:-redrat}
-    restart: unless-stopped
-
-  apache:
-    image: httpd:2.4
-    depends_on:
-      - web
-    ports:
-      - "80:80"
-    volumes:
-      - ./apache/redrat.conf:/usr/local/apache2/conf/extra/redrat.conf
-      - ./app/static:/var/www/redrat/static
-    command: /bin/bash -c "echo 'Include conf/extra/redrat.conf' >> /usr/local/apache2/conf/httpd.conf && httpd-foreground"
     restart: unless-stopped

@@ -69,12 +69,18 @@ npm run dev:css
    MYSQL_DB=redrat
    ```
 
-2. Start the containers
+2. Start the container
    ```
    docker-compose up -d
    ```
 
-This will start the Flask application and Apache web server in containers. The application will connect to MySQL running on your host machine.
+This will start the Flask application in a container. The application will:
+- Connect to MySQL running on your host machine
+- Expose port 5000 on localhost, which your host's reverse proxy can forward to
+
+### Reverse Proxy Configuration
+
+The application is designed to work behind a reverse proxy. An example Apache configuration is provided in the `apache/redrat.conf` file, which you can use as a reference for setting up your reverse proxy on the Docker host.
 
 ## License
 
