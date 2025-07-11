@@ -10,6 +10,6 @@ class Config:
     MYSQL_USER = os.getenv('MYSQL_USER')
     MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD')
     SECRET_KEY = os.getenv('SECRET_KEY')
-    UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER')
+    UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', 'app/static/uploads')
     REDRAT_XMLRPC_URL = os.getenv('REDRAT_XMLRPC_URL')
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')

@@ -25,6 +25,6 @@ services:
       # You may need to adjust these values based on your host MySQL configuration
       - MYSQL_USER=${MYSQL_USER:-redrat}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-redratpass}
-      - MYSQL_DB=${MYSQL_DB:-redrat}
+      - MYSQL_DB=${MYSQL_DB:-redrat_proxy}  # Match the database name in mysql_schema.sql
       - PYTHONPATH=/app
     restart: unless-stopped

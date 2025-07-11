@@ -53,6 +53,33 @@ EOF
 echo "Testing imports..."
 python /tmp/test_imports.py
 
+# Test MySQL connection
+echo "Testing MySQL connection..."
+cat > /tmp/test_mysql.py << EOF
+import os
+import sys
+import mysql.connector
+
+try:
+    conn = mysql.connector.connect(
+        host=os.getenv('MYSQL_HOST', 'host.docker.internal'),
+        user=os.getenv('MYSQL_USER', 'redrat'),
+        password=os.getenv('MYSQL_PASSWORD', 'redratpass'),
+        database=os.getenv('MYSQL_DB', 'redrat_proxy')
+    )
+    print("✅ Successfully connected to MySQL")
+    conn.close()
+except Exception as e:
+    print("❌ Failed to connect to MySQL:", e)
+    sys.exit(1)
+EOF
+
+python /tmp/test_mysql.py
+
+# Continue with command execution
+echo "Starting the application..."
+exec "$@"
+
 # Execute the command passed to docker run
 echo "Running command: $@"
 exec "$@"

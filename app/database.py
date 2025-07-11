@@ -28,6 +28,7 @@ class MySQLDatabase:
 
     @contextmanager
     def get_connection(self):
+        """Get a connection from the pool"""
         conn = None
         try:
             conn = self.connection_pool.get_connection()
@@ -41,3 +42,9 @@ class MySQLDatabase:
 
 # Singleton instance
 db = MySQLDatabase()
+
+@contextmanager
+def get_db():
+    """Convenience function to get a database connection with cursor"""
+    with db.get_connection() as conn:
+        yield conn
