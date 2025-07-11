@@ -13,6 +13,7 @@ services:
       - ./app.py:/app/app.py  # The main entry point
       - ./requirements.txt:/app/requirements.txt  # Dependencies
       - ./mysql_schema.sql:/app/mysql_schema.sql  # Database schema
+      - ./docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh  # For easy debugging
       
       # Mount data directories
       - ./data/uploads:/app/app/static/uploads  # For persistent uploads
@@ -33,3 +34,4 @@ services:
       - REDRAT_XMLRPC_URL=${REDRAT_XMLRPC_URL:-http://localhost:8000/RPC2}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     restart: unless-stopped
+    command: bash -c "chmod +x /usr/local/bin/docker-entrypoint.sh && /usr/local/bin/docker-entrypoint.sh /app/venv/bin/python app.py"

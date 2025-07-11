@@ -34,6 +34,21 @@ EXPECTED_TABLES = [
     'command_templates'
 ]
 
+def check_table_structure(cursor, table_name):
+    """Check the structure of a table and return column names"""
+    try:
+        cursor.execute(f"DESCRIBE {table_name}")
+        columns = cursor.fetchall()
+        print(f"\n--- Structure of {table_name} ---")
+        column_names = []
+        for col in columns:
+            print(f"  Column: {col[0]}, Type: {col[1]}")
+            column_names.append(col[0])
+        return column_names
+    except Exception as e:
+        print(f"Error checking table structure for {table_name}: {e}")
+        return []
+
 def check_database_health():
     """Check if all expected tables exist in the database"""
     try:
@@ -52,6 +67,17 @@ def check_database_health():
             print(f"❌ ERROR: The following tables are missing: {', '.join(missing_tables)}")
             return False
         
+        # Check key table structures to make sure they're correct
+        critical_tables = ['users', 'sessions', 'remotes']
+        for table in critical_tables:
+            columns = check_table_structure(cursor, table)
+            if table == 'users' and 'username' not in columns:
+                print(f"❌ ERROR: Table '{table}' is missing the username column!")
+                return False
+            elif table == 'sessions' and 'user_id' not in columns:
+                print(f"❌ ERROR: Table '{table}' is missing the user_id column!")
+                return False
+        
         # Check if users table has at least one admin user
         cursor.execute("SELECT COUNT(*) FROM users WHERE is_admin = TRUE")
         admin_count = cursor.fetchone()[0]
@@ -60,8 +86,24 @@ def check_database_health():
             print("⚠️ WARNING: No admin users found in the database")
         else:
             print(f"✅ Found {admin_count} admin user(s)")
+            
+            # Get admin user details
+            cursor.execute("SELECT id, username FROM users WHERE is_admin = TRUE")
+            admins = cursor.fetchall()
+            for admin in admins:
+                print(f"  Admin ID: {admin[0]}, Username: {admin[1]}")
+        
+        # Check foreign key relationships
+        print("\nChecking foreign key relationships:")
+        try:
+            # Test sessions foreign key
+            cursor.execute("SELECT COUNT(*) FROM sessions JOIN users ON sessions.user_id = users.id")
+            print("✅ sessions -> users relationship is valid")
+        except Exception as e:
+            print(f"❌ sessions -> users relationship error: {e}")
         
         # Check table row counts
+        print("\nTable statistics:")
         for table in EXPECTED_TABLES:
             cursor.execute(f"SELECT COUNT(*) FROM {table}")
             count = cursor.fetchone()[0]
@@ -70,7 +112,7 @@ def check_database_health():
         cursor.close()
         conn.close()
         
-        print("✅ Database health check passed!")
+        print("\n✅ Database health check passed!")
         return True
         
     except mysql.connector.Error as err:
