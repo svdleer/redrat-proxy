@@ -68,9 +68,26 @@ class IRDBService:
         logger.info(f"Uploaded remote XML file: {filename}")
         return f"app/{filepath}"
 
-def get_irdb_files():
-    with get_db() as conn:
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM irdb_files")
-        rows = cursor.fetchall()
-        return [IRDBFile.from_db_row(row) for row in rows]
+    @staticmethod
+    def get_remote_files():
+        """Get all remote files"""
+        if not db:
+            return []
+            
+        with db.get_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT * FROM remote_files")
+            rows = cursor.fetchall()
+            return rows
+
+    @staticmethod
+    def get_remote_file(file_id):
+        """Get a specific remote file by ID"""
+        if not db:
+            return None
+            
+        with db.get_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT * FROM remote_files WHERE id = %s", (file_id,))
+            row = cursor.fetchone()
+            return row

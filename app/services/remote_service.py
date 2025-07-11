@@ -3,6 +3,24 @@ import os
 import xml.etree.ElementTree as ET
 import json
 import datetime
+import logging
+
+# Try to import necessary modules with fallbacks for testing
+try:
+    from werkzeug.utils import secure_filename
+except ImportError:
+    def secure_filename(filename):
+        return filename.replace(' ', '_')
+
+try:
+    from app.utils.logger import logger
+except ImportError:
+    logger = logging.getLogger("redrat")
+    logger.setLevel(logging.INFO)
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        logger.addHandler(handler)
 
 # Add the app directory to the path to import the database module
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../..'))
@@ -14,6 +32,72 @@ try:
 except ImportError:
     # Fall back to relative import (when importing within the package)
     from ..mysql_db import db
+
+
+class RemoteService:
+    """Service for handling remote operations"""
+    
+    @staticmethod
+    def upload_remote_file(file, user_id):
+        """Upload an XML file containing remote data"""
+        if not file.filename.endswith('.xml'):
+            raise ValueError("Only .xml files are accepted")
+        
+        filename = secure_filename(file.filename)
+        filepath = f"static/remote_files/{filename}"
+        
+        # Make sure the directory exists
+        os.makedirs("app/static/remote_files", exist_ok=True)
+        
+        file.save(f"app/{filepath}")
+        
+        if db:
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Check if file already exists
+                cursor.execute("SELECT id FROM remote_files WHERE filename = %s", (filename,))
+                result = cursor.fetchone()
+                
+                if result:
+                    file_id = result[0]
+                    logger.info(f"Remote file '{filename}' already exists with ID {file_id}")
+                else:
+                    cursor.execute(
+                        """INSERT INTO remote_files 
+                           (name, filename, filepath, uploaded_by) 
+                           VALUES (%s, %s, %s, %s)""",
+                        (filename, filename, filepath, user_id)
+                    )
+                    file_id = cursor.lastrowid
+                    conn.commit()
+                    logger.info(f"Created new remote file '{filename}' with ID {file_id}")
+        
+        logger.info(f"Uploaded remote XML file: {filename}")
+        return f"app/{filepath}"
+
+    @staticmethod
+    def get_remote_files():
+        """Get all remote files"""
+        if not db:
+            return []
+            
+        with db.get_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT * FROM remote_files")
+            return cursor.fetchall()
+    
+    @staticmethod
+    def get_remote_file(file_id):
+        """Get a specific remote file by ID"""
+        if not db:
+            return None
+            
+        with db.get_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT * FROM remote_files WHERE id = %s", (file_id,))
+            return cursor.fetchone()
+
 
 def parse_remotes_xml(xml_path):
     """Parse the remotes XML file and return a list of remote devices with their commands"""
