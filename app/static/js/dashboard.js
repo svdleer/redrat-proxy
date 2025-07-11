@@ -5,6 +5,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load recent commands
     loadRecentCommands();
     
+    // Setup event source for real-time updates
+    setupEventSource();
+    
     // Command form handling
     document.getElementById('commandForm').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -185,4 +188,54 @@ async function loadRecentCommands() {
     } catch (error) {
         console.error('Error loading recent commands:', error);
     }
+}
+
+function setupEventSource() {
+    try {
+        const eventSource = new EventSource('/api/events');
+        
+        eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'command_update') {
+                // Update the command in the UI
+                updateCommandStatus(data.command);
+                // Reload recent commands
+                loadRecentCommands();
+            } else if (data.type === 'heartbeat') {
+                // Just a keep-alive, no action needed
+                console.log('Heartbeat received');
+            }
+        };
+        
+        eventSource.onerror = (error) => {
+            console.error('EventSource error:', error);
+            // Try to reconnect after 5 seconds
+            setTimeout(() => {
+                setupEventSource();
+            }, 5000);
+        };
+    } catch (error) {
+        console.error('Error setting up EventSource:', error);
+    }
+}
+
+function updateCommandStatus(command) {
+    const commandRow = document.getElementById(`command-${command.id}`);
+    if (!commandRow) return;
+    
+    const statusCell = commandRow.querySelector('.status');
+    if (!statusCell) return;
+    
+    // Determine status class
+    let statusClass = 'bg-yellow-100 text-yellow-800';
+    if (command.status === 'executed') {
+        statusClass = 'bg-green-100 text-green-800';
+    } else if (command.status === 'failed') {
+        statusClass = 'bg-red-100 text-red-800';
+    }
+    
+    // Update the status text and class
+    statusCell.textContent = command.status;
+    statusCell.className = `status px-2 py-1 rounded-full text-xs ${statusClass}`;
 }

@@ -97,7 +97,7 @@
                 <img src="/static/images/logo.png" alt="RedRat Logo" class="h-10 w-auto mr-3">
                 <span class="text-xl font-bold">RedRat Dashboard</span>
             </div>
-            {% if current_user.is_authenticated %}
+            {% if user %}
             <nav class="hidden md:flex space-x-6">
                 <a href="/" class="hover:text-blue-200 transition {% if request.path == '/' %}font-bold{% endif %}">
                     <i class="fas fa-tachometer-alt mr-1"></i> Dashboard
@@ -105,7 +105,7 @@
                 <a href="/commands" class="hover:text-blue-200 transition {% if request.path == '/commands' %}font-bold{% endif %}">
                     <i class="fas fa-terminal mr-1"></i> Commands
                 </a>
-                {% if current_user.is_admin %}
+                {% if user.is_admin %}
                 <a href="/admin/remotes" class="hover:text-blue-200 transition {% if request.path == '/admin/remotes' %}font-bold{% endif %}">
                     <i class="fas fa-satellite-dish mr-1"></i> Remotes
                 </a>
@@ -115,7 +115,7 @@
                 {% endif %}
             </nav>
             <div class="flex items-center">
-                <span class="mr-3">{{ current_user.username }}</span>
+                <span class="mr-3">{{ user.username }}</span>
                 <a href="/logout" class="hover:text-blue-200 transition">
                     <i class="fas fa-sign-out-alt"></i>
                 </a>
@@ -130,7 +130,7 @@
 
     <footer class="bg-gray-800 text-white py-4">
         <div class="container mx-auto px-4 text-center">
-            <p>&copy; {% now "Y" %} RedRat Dashboard. All rights reserved.</p>
+            <p>&copy; {{ now.year }} RedRat Dashboard. All rights reserved.</p>
         </div>
     </footer>
     

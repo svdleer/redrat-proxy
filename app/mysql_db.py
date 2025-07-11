@@ -37,28 +37,36 @@ class MySQLDatabase:
             if conn:
                 conn.close()
 
-    def init_db(self):
+    def init_db(self, force_recreate=False):
+        """Initialize the database with tables from mysql_schema.sql"""
+        # Read the SQL schema
+        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        schema_path = os.path.join(script_dir, 'mysql_schema.sql')
+        
+        try:
+            with open(schema_path, 'r') as f:
+                schema_sql = f.read()
+        except Exception as e:
+            print(f"Error reading schema file: {e}")
+            return
+        
+        # Split the SQL into individual statements
+        statements = schema_sql.split(';')
+        
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            # Create tables if they don't exist
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS remotes (
-                    id VARCHAR(36) PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL,
-                    api_key VARCHAR(255) UNIQUE NOT NULL,
-                    image_path VARCHAR(255),
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS irdb_files (
-                    id VARCHAR(36) PRIMARY KEY,
-                    filename VARCHAR(255) NOT NULL,
-                    filepath VARCHAR(255) NOT NULL,
-                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
+            
+            # Skip the CREATE DATABASE and USE statements
+            for statement in statements[2:]:
+                if statement.strip():
+                    try:
+                        cursor.execute(statement)
+                    except Exception as e:
+                        print(f"Error executing SQL: {e}")
+                        print(f"Statement: {statement}")
+            
             conn.commit()
+            print("Database initialized successfully")
 
 # Singleton instance
 db = MySQLDatabase()

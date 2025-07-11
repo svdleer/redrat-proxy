@@ -25,6 +25,11 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 # Initialize database
 db.init_db()
 
+# Add current datetime and request to all templates
+@app.context_processor
+def inject_globals():
+    return {'now': datetime.utcnow(), 'request': request}
+
 @app.route('/')
 @login_required()
 def dashboard(user):
@@ -32,7 +37,7 @@ def dashboard(user):
 
 @app.route('/login')
 def login_page():
-    return render_template('login.html')
+    return render_template('login.html', user=None)
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -238,6 +243,21 @@ def events(user):
 @app.route('/static/<path:filename>')
 def static_files(filename):
     return send_from_directory('static', filename)
+
+@app.route('/commands')
+@login_required()
+def commands(user):
+    return render_template('command.html', user=user)
+
+@app.route('/admin/remotes')
+@login_required(admin_only=True)
+def admin_remotes(user):
+    return render_template('admin/remotes.html', user=user)
+
+@app.route('/admin/users')
+@login_required(admin_only=True)
+def admin_users(user):
+    return render_template('admin/users.html', user=user)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
