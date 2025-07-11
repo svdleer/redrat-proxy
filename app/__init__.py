@@ -31,11 +31,9 @@ def create_app():
     db.init_app(app)  # If your MySQLDatabase class has init_app method
     socketio.init_app(app)
     
-    # Import and register blueprints
-    from .routes import main_bp, api_bp, admin_bp
-    app.register_blueprint(main_bp)
-    app.register_blueprint(api_bp, url_prefix='/api')
-    app.register_blueprint(admin_bp, url_prefix='/admin')
+    # Initialize routes
+    from .routes import init_routes
+    init_routes(app)
     
     # Import and register error handlers
     from .errors import init_error_handlers

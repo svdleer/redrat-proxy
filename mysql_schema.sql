@@ -31,6 +31,56 @@ CREATE TABLE IF NOT EXISTS irdb_files (
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS commands (
+    id VARCHAR(36) PRIMARY KEY,
+    remote_id VARCHAR(36) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    command_data TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (remote_id) REFERENCES remotes(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS command_sequences (
+    id VARCHAR(36) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_by VARCHAR(36) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS sequence_commands (
+    id VARCHAR(36) PRIMARY KEY,
+    sequence_id VARCHAR(36) NOT NULL,
+    command_id VARCHAR(36) NOT NULL,
+    position INT NOT NULL,
+    delay_ms INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sequence_id) REFERENCES command_sequences(id) ON DELETE CASCADE,
+    FOREIGN KEY (command_id) REFERENCES commands(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS scheduled_tasks (
+    id VARCHAR(36) PRIMARY KEY,
+    type ENUM('command', 'sequence') NOT NULL,
+    target_id VARCHAR(36) NOT NULL,
+    schedule_type ENUM('once', 'daily', 'weekly', 'monthly') NOT NULL,
+    schedule_data JSON NOT NULL,
+    next_run DATETIME NOT NULL,
+    created_by VARCHAR(36) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS command_templates (
+    id VARCHAR(36) PRIMARY KEY,
+    irdb_id VARCHAR(36) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    template_data JSON NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (irdb_id) REFERENCES irdb_files(id) ON DELETE CASCADE
+);
+
 -- Default admin user (password: admin123)
 INSERT INTO users (id, username, password_hash, is_admin)
 VALUES ('admin-id', 'admin', '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', TRUE);
