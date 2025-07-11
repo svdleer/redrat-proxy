@@ -16,6 +16,7 @@ services:
       - ./docker-entrypoint.sh:/app/docker-entrypoint.sh  # Original entrypoint
       - ./docker-entrypoint-new.sh:/app/docker-entrypoint-new.sh  # New robust entrypoint
       - ./db_diagnostic.py:/app/db_diagnostic.py  # Database diagnostic tool
+      - ./docker-reset-admin.sh:/app/docker-reset-admin.sh  # Admin password reset
       
       # Mount data directories
       - ./data/uploads:/app/app/static/uploads  # For persistent uploads

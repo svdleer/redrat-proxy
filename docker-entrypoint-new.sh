@@ -61,27 +61,81 @@ chmod -R 777 /app/app/static
 # Try to initialize the database
 echo "Initializing database..."
 python -m app.database.init_db || {
-    echo "Database initialization using app module failed. Trying direct script..."
-    # Direct approach if module fails
-    DB_NAME=${MYSQL_DB:-redrat_proxy}
-    MYSQL_CMD="mysql -h ${MYSQL_HOST:-host.docker.internal} -u ${MYSQL_USER:-redrat} -p${MYSQL_PASSWORD:-redratpass} -P ${MYSQL_PORT:-3306}"
+    echo "Database initialization using app module failed. Trying Python direct script..."
     
-    # Create database if it doesn't exist
-    echo "Creating database $DB_NAME if it doesn't exist..."
-    $MYSQL_CMD -e "CREATE DATABASE IF NOT EXISTS $DB_NAME;"
+    python -c "
+import mysql.connector
+import os
+import sys
+import time
+
+# Database configuration
+db_config = {
+    'host': os.environ.get('MYSQL_HOST', 'host.docker.internal'),
+    'user': os.environ.get('MYSQL_USER', 'redrat'),
+    'password': os.environ.get('MYSQL_PASSWORD', 'redratpass'),
+    'port': int(os.environ.get('MYSQL_PORT', '3306')),
+}
+
+db_name = os.environ.get('MYSQL_DB', 'redrat_proxy')
+print(f'Setting up database: {db_name}')
+
+try:
+    # Connect without database first
+    conn = mysql.connector.connect(**db_config)
+    cursor = conn.cursor()
     
-    # Import schema
-    echo "Importing schema from mysql_schema.sql..."
-    $MYSQL_CMD $DB_NAME < /app/mysql_schema.sql
+    # Create database if doesn't exist
+    print('Creating database if not exists...')
+    cursor.execute(f'CREATE DATABASE IF NOT EXISTS {db_name}')
     
-    # Verify admin user exists
-    echo "Verifying admin user..."
-    ADMIN_COUNT=$($MYSQL_CMD -N -e "SELECT COUNT(*) FROM $DB_NAME.users WHERE username='admin';")
+    # Switch to the database
+    cursor.execute(f'USE {db_name}')
     
-    if [ "$ADMIN_COUNT" -eq 0 ]; then
-        echo "Creating admin user..."
-        $MYSQL_CMD $DB_NAME -e "INSERT INTO users (id, username, password_hash, is_admin) VALUES ('admin-id', 'admin', '\$2b\$12\$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', TRUE);"
-    fi
+    # Read schema file
+    with open('/app/mysql_schema.sql', 'r') as f:
+        schema = f.read()
+    
+    # Skip first two lines (CREATE DATABASE and USE statements)
+    schema_lines = schema.split('\\n')
+    if schema_lines[0].startswith('CREATE DATABASE') and schema_lines[1].startswith('USE'):
+        schema = '\\n'.join(schema_lines[2:])
+    
+    # Execute schema statements
+    print('Executing schema...')
+    statements = schema.split(';')
+    for stmt in statements:
+        stmt = stmt.strip()
+        if stmt:
+            try:
+                cursor.execute(stmt)
+            except Exception as e:
+                print(f'Error executing statement: {e}')
+    
+    # Commit changes
+    conn.commit()
+    
+    # Check if admin user exists
+    print('Checking admin user...')
+    cursor.execute('SELECT COUNT(*) FROM users WHERE username = %s', ('admin',))
+    admin_count = cursor.fetchone()[0]
+    
+    if admin_count == 0:
+        print('Creating admin user...')
+        cursor.execute(
+            'INSERT INTO users (id, username, password_hash, is_admin) VALUES (%s, %s, %s, %s)',
+            ('admin-id', 'admin', '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', True)
+        )
+        conn.commit()
+    
+    cursor.close()
+    conn.close()
+    print('Database initialization completed successfully!')
+
+except Exception as e:
+    print(f'Error during database setup: {e}')
+    sys.exit(1)
+"
 }
 
 # Reset the admin password if DB exists but login fails

@@ -96,11 +96,19 @@ IF "%CHOICE%"=="4" (
         ECHO Database: %MYSQL_DB%
         ECHO.
         
-        REM Execute MySQL commands to drop and recreate database
-        mysql -h %MYSQL_HOST% -u %MYSQL_USER% -p%MYSQL_PASSWORD% -e "DROP DATABASE IF EXISTS %MYSQL_DB%; CREATE DATABASE %MYSQL_DB%;"
-        
-        REM Import schema
-        mysql -h %MYSQL_HOST% -u %MYSQL_USER% -p%MYSQL_PASSWORD% %MYSQL_DB% < mysql_schema.sql
+        REM Try to use MySQL client if available, otherwise use Python
+        WHERE mysql >nul 2>&1
+        IF %ERRORLEVEL% EQU 0 (
+            ECHO Using MySQL client...
+            mysql -h %MYSQL_HOST% -u %MYSQL_USER% -p%MYSQL_PASSWORD% -e "DROP DATABASE IF EXISTS %MYSQL_DB%; CREATE DATABASE %MYSQL_DB%;"
+            mysql -h %MYSQL_HOST% -u %MYSQL_USER% -p%MYSQL_PASSWORD% %MYSQL_DB% < mysql_schema.sql
+        ) ELSE (
+            ECHO MySQL client not found, using Python instead...
+            python -c "import mysql.connector; conn = mysql.connector.connect(host='%MYSQL_HOST%', user='%MYSQL_USER%', password='%MYSQL_PASSWORD%'); cursor = conn.cursor(); cursor.execute('DROP DATABASE IF EXISTS %MYSQL_DB%'); cursor.execute('CREATE DATABASE %MYSQL_DB%'); conn.commit(); cursor.close(); conn.close(); print('Database dropped and recreated')"
+            
+            ECHO Importing schema with Python...
+            python -c "import mysql.connector; import os; conn = mysql.connector.connect(host='%MYSQL_HOST%', user='%MYSQL_USER%', password='%MYSQL_PASSWORD%', database='%MYSQL_DB%'); cursor = conn.cursor(); schema = open('mysql_schema.sql', 'r').read(); statements = [s for s in schema.split(';') if s.strip()]; [cursor.execute(stmt) for stmt in statements if not (stmt.strip().startswith('CREATE DATABASE') or stmt.strip().startswith('USE'))]; conn.commit(); cursor.close(); conn.close(); print('Schema imported successfully')"
+        )
         
         ECHO.
         ECHO Database has been reset. Restarting Docker container...
