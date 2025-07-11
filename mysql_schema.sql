@@ -37,11 +37,11 @@ CREATE TABLE IF NOT EXISTS irdb_files (
 
 CREATE TABLE IF NOT EXISTS commands (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    remote_id VARCHAR(36) NOT NULL,
+    remote_id INT NOT NULL,
     command VARCHAR(255) NOT NULL,
     device VARCHAR(255),
     status ENUM('pending', 'executed', 'failed') NOT NULL DEFAULT 'pending',
-    created_by VARCHAR(36) NOT NULL,
+    created_by INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     executed_at TIMESTAMP NULL,
     status_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
