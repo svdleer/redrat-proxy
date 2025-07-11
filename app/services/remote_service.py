@@ -44,37 +44,55 @@ class RemoteService:
             raise ValueError("Only .xml files are accepted")
         
         filename = secure_filename(file.filename)
-        filepath = f"static/remote_files/{filename}"
         
-        # Make sure the directory exists
-        os.makedirs("app/static/remote_files", exist_ok=True)
+        # Process the file directly without saving
+        import tempfile
+        temp_path = os.path.join(tempfile.gettempdir(), filename)
+        file.save(temp_path)
         
-        file.save(f"app/{filepath}")
-        
-        if db:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
+        try:
+            # Parse and process the XML file
+            remotes = parse_remotes_xml(temp_path)
+            if not remotes or len(remotes) == 0:
+                raise ValueError("No valid remotes found in XML file")
                 
-                # Check if file already exists
-                cursor.execute("SELECT id FROM remote_files WHERE filename = %s", (filename,))
-                result = cursor.fetchone()
+            # Extract basic info from first remote for DB record
+            first_remote = remotes[0]
+            device_type = first_remote.get('device_type', '')
+            manufacturer = first_remote.get('manufacturer', '')
                 
-                if result:
-                    file_id = result[0]
-                    logger.info(f"Remote file '{filename}' already exists with ID {file_id}")
-                else:
-                    cursor.execute(
-                        """INSERT INTO remote_files 
-                           (name, filename, filepath, uploaded_by) 
-                           VALUES (%s, %s, %s, %s)""",
-                        (filename, filename, filepath, user_id)
-                    )
-                    file_id = cursor.lastrowid
-                    conn.commit()
-                    logger.info(f"Created new remote file '{filename}' with ID {file_id}")
-        
-        logger.info(f"Uploaded remote XML file: {filename}")
-        return f"app/{filepath}"
+            if db:
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    
+                    # Check if file already exists
+                    cursor.execute("SELECT id FROM remote_files WHERE filename = %s", (filename,))
+                    result = cursor.fetchone()
+                    
+                    if result:
+                        file_id = result[0]
+                        logger.info(f"Remote file '{filename}' already exists with ID {file_id}")
+                    else:
+                        cursor.execute(
+                            """INSERT INTO remote_files 
+                               (name, filename, filepath, manufacturer, device_type, uploaded_by) 
+                               VALUES (%s, %s, %s, %s, %s, %s)""",
+                            (filename, filename, '', manufacturer, device_type, user_id)
+                        )
+                        file_id = cursor.lastrowid
+                        conn.commit()
+                        logger.info(f"Created new remote file '{filename}' with ID {file_id}")
+                        
+                    # Import the remotes to the database
+                    imported_count = import_remotes_to_db(remotes, user_id)
+                    logger.info(f"Imported {imported_count} remotes from '{filename}'")
+            
+            logger.info(f"Processed remote XML file: {filename}")
+            return temp_path
+        finally:
+            # Clean up the temporary file
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
 
     @staticmethod
     def get_remote_files():
@@ -277,8 +295,8 @@ def import_remotes_to_db(remotes, user_id=None):
                 print(f"Remote file '{filename}' already exists with ID {file_id}")
             else:
                 cursor.execute(
-                    "INSERT INTO remote_files (name, filename, filepath, device_type, uploaded_by) VALUES (%s, %s, %s, %s, %s)",
-                    (remote['name'], filename, filepath, remote['device_type'], user_id)
+                    "INSERT INTO remote_files (name, filename, filepath, device_type, manufacturer, uploaded_by) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (remote['name'], filename, filepath, remote['device_type'], remote['manufacturer'], user_id)
                 )
                 file_id = cursor.lastrowid
                 conn.commit()

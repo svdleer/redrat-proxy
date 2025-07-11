@@ -1,7 +1,7 @@
 from .user import User
 from .remote import Remote
 from .command import Command
-from .irdb import IRDBFile
+from .remote_file import RemoteFile
 from .sequence import CommandSequence, SequenceCommand
 from .schedule import ScheduledTask
 from .template import CommandTemplate
@@ -10,7 +10,7 @@ __all__ = [
     'User', 
     'Remote', 
     'Command', 
-    'IRDBFile',
+    'RemoteFile',
     'CommandSequence',
     'SequenceCommand',
     'ScheduledTask',
