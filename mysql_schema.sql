@@ -82,5 +82,6 @@ CREATE TABLE IF NOT EXISTS command_templates (
 );
 
 -- Default admin user (password: admin123)
+-- This hash is generated using bcrypt with 12 rounds
 INSERT INTO users (id, username, password_hash, is_admin)
-VALUES ('admin-id', 'admin', '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', TRUE);
+VALUES ('admin-id', 'admin', '$2b$12$8NwSjJj4cdXkS76kNakZy.y0Fih5.jB/0KjBh94AVsCxpgIMnX9/S', TRUE);

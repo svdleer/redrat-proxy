@@ -193,6 +193,63 @@ The dashboard provides real-time monitoring of:
 - Signal visualization for debugging
 - System health metrics
 
+## Maintenance Tools
+
+Several maintenance tools are included to help manage the RedRat Proxy system:
+
+### Quick Start - Using maintenance.bat
+
+A maintenance script is provided for common tasks:
+
+1. Run `maintenance.bat` from the project root
+2. Select the operation you want to perform:
+   - Reset Admin Password - Creates or updates the admin user with password 'admin123'
+   - Run Housekeeping - Cleans up unused files and sessions
+   - Run Login Diagnostic - Checks database connection and login issues
+   - Update Logo to PNG - Converts SVG logo to PNG format
+
+### Manual Maintenance
+
+You can also run these scripts individually:
+
+```bash
+# Reset admin password
+python reset_admin_password.py
+
+# Clean up unused files and expired sessions
+python housekeeping.py
+
+# Diagnose login issues
+python login_diagnostic.py
+```
+
+### Fixing Login Issues
+
+If you can't login, try these steps:
+
+1. Run the login diagnostic: `python login_diagnostic.py`
+2. Reset the admin password: `python reset_admin_password.py`
+3. Check that your MySQL connection details are correct
+4. Clear your browser cookies and cache
+
+### Housekeeping Options
+
+The housekeeping script accepts several parameters:
+
+```bash
+# Run with default settings (7-day threshold)
+python housekeeping.py
+
+# Only preview what would be removed (dry run)
+python housekeeping.py --dry-run
+
+# Set custom age threshold (in days)
+python housekeeping.py --days 30
+
+# Specify custom base directory
+python housekeeping.py --base-dir /path/to/installation
+```
+
 ### Reverse Proxy Configuration
 
 The application is designed to work behind a reverse proxy. An example Apache configuration is provided in the `apache/redrat.conf` file, which you can use as a reference for setting up your reverse proxy on the Docker host.
