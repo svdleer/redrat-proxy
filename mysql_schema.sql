@@ -4,8 +4,14 @@ USE redrat_proxy;
 CREATE TABLE IF NOT EXISTS remotes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    manufacturer VARCHAR(255),
+    device_model_number VARCHAR(255),
+    remote_model_number VARCHAR(255),
+    device_type VARCHAR(255),
+    decoder_class VARCHAR(255),
     description TEXT,
     image_path VARCHAR(255),
+    config_data JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

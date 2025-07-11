@@ -10,8 +10,10 @@ except ImportError:
     from .mysql_db import db
 import uuid
 import os
+import sys
 import json
 import time
+import tempfile
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -125,10 +127,156 @@ def get_stats(user):
 def get_remotes(user):
     with db.get_connection() as conn:
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM remotes")
+        cursor.execute("""
+            SELECT r.*, COUNT(c.id) as command_count 
+            FROM remotes r 
+            LEFT JOIN commands c ON r.id = c.remote_id 
+            GROUP BY r.id
+        """)
         remotes = cursor.fetchall()
         
     return jsonify(remotes)
+    
+@app.route('/api/remotes', methods=['POST'])
+@login_required()
+def create_remote(user):
+    """Create a new remote"""
+    data = request.json
+    
+    # Validate required fields
+    if not data.get('name'):
+        return jsonify({"error": "Remote name is required"}), 400
+    
+    with db.get_connection() as conn:
+        cursor = conn.cursor(dictionary=True)
+        
+        # Check if remote with this name already exists
+        cursor.execute("SELECT id FROM remotes WHERE name = %s", (data['name'],))
+        if cursor.fetchone():
+            return jsonify({"error": "Remote with this name already exists"}), 400
+        
+        # Insert the remote
+        cursor.execute("""
+            INSERT INTO remotes (
+                name, manufacturer, device_type, description
+            ) VALUES (%s, %s, %s, %s)
+        """, (
+            data['name'], 
+            data.get('manufacturer', ''),
+            data.get('device_type', ''),
+            data.get('description', '')
+        ))
+        
+        remote_id = cursor.lastrowid
+        conn.commit()
+        
+        # Get the created remote
+        cursor.execute("SELECT * FROM remotes WHERE id = %s", (remote_id,))
+        remote = cursor.fetchone()
+    
+    return jsonify(remote)
+    
+@app.route('/api/remotes/import-xml', methods=['POST'])
+@login_required()
+def import_xml(user):
+    """Import remotes from XML file"""
+    import tempfile
+    
+    if 'xml_file' not in request.files:
+        return jsonify({"error": "No XML file uploaded"}), 400
+        
+    xml_file = request.files['xml_file']
+    
+    if not xml_file or xml_file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+    
+    if not xml_file.filename.endswith('.xml'):
+        return jsonify({"error": "File must be an XML file"}), 400
+    
+    # Save the file temporarily
+    temp_path = os.path.join(tempfile.gettempdir(), "remotes_import.xml")
+    xml_file.save(temp_path)
+    
+    try:
+        # Use the remote service to import XML
+        from app.services.remote_service import import_remotes_from_xml
+        
+        imported_count = import_remotes_from_xml(temp_path, user['id'])
+        return jsonify({"message": "Import successful", "imported": imported_count}), 200
+    except Exception as e:
+        app.logger.error(f"Error importing XML: {str(e)}")
+        return jsonify({"error": "Error importing XML", "message": str(e)}), 500
+    finally:
+        # Clean up the temporary file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+            
+@app.route('/api/remotes/<int:remote_id>', methods=['GET', 'PUT', 'DELETE'])
+@login_required()
+def remote_detail(user, remote_id):
+    """Handle individual remote operations"""
+    with db.get_connection() as conn:
+        cursor = conn.cursor(dictionary=True)
+        
+        if request.method == 'GET':
+            # Get remote details
+            cursor.execute("SELECT * FROM remotes WHERE id = %s", (remote_id,))
+            remote = cursor.fetchone()
+            
+            if not remote:
+                return jsonify({"error": "Remote not found"}), 404
+                
+            return jsonify(remote)
+            
+        elif request.method == 'PUT':
+            # Update remote
+            data = request.json
+            
+            # Validate required fields
+            if not data.get('name'):
+                return jsonify({"error": "Remote name is required"}), 400
+            
+            # Check if remote exists
+            cursor.execute("SELECT id FROM remotes WHERE id = %s", (remote_id,))
+            if not cursor.fetchone():
+                return jsonify({"error": "Remote not found"}), 404
+            
+            # Update the remote
+            cursor.execute("""
+                UPDATE remotes SET 
+                name = %s, 
+                manufacturer = %s,
+                device_model_number = %s,
+                device_type = %s,
+                description = %s
+                WHERE id = %s
+            """, (
+                data['name'],
+                data.get('manufacturer', ''),
+                data.get('device_model_number', ''),
+                data.get('device_type', ''),
+                data.get('description', ''),
+                remote_id
+            ))
+            conn.commit()
+            
+            # Get updated remote
+            cursor.execute("SELECT * FROM remotes WHERE id = %s", (remote_id,))
+            remote = cursor.fetchone()
+            
+            return jsonify(remote)
+            
+        elif request.method == 'DELETE':
+            # Check if remote exists
+            cursor.execute("SELECT id FROM remotes WHERE id = %s", (remote_id,))
+            if not cursor.fetchone():
+                return jsonify({"error": "Remote not found"}), 404
+            
+            # Delete the remote
+            cursor.execute("DELETE FROM remotes WHERE id = %s", (remote_id,))
+            conn.commit()
+            
+            return jsonify({"message": f"Remote {remote_id} deleted successfully"})
 
 @app.route('/api/commands', methods=['GET', 'POST'])
 @login_required()

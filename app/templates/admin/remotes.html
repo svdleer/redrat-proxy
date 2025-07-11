@@ -9,18 +9,34 @@
         </button>
     </div>
 
-    <!-- IRDB File Upload -->
+    <!-- IRDB & XML File Upload -->
     <div class="bg-white rounded-lg shadow p-6 mb-8">
-        <h2 class="text-xl font-semibold mb-4">Upload IRDB File</h2>
-        <form id="irdbUploadForm" enctype="multipart/form-data">
-            <div class="flex items-center space-x-4">
-                <input type="file" name="irdb_file" accept=".irdb" required
-                    class="file-input">
-                <button type="submit" class="btn-secondary">
-                    <i class="fas fa-upload mr-2"></i> Upload
-                </button>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div>
+                <h2 class="text-xl font-semibold mb-4">Upload IRDB File</h2>
+                <form id="irdbUploadForm" enctype="multipart/form-data">
+                    <div class="flex items-center space-x-4">
+                        <input type="file" name="irdb_file" accept=".irdb" required
+                            class="file-input">
+                        <button type="submit" class="btn-secondary">
+                            <i class="fas fa-upload mr-2"></i> Upload
+                        </button>
+                    </div>
+                </form>
             </div>
-        </form>
+            <div>
+                <h2 class="text-xl font-semibold mb-4">Upload Remotes XML</h2>
+                <form id="xmlUploadForm" enctype="multipart/form-data">
+                    <div class="flex items-center space-x-4">
+                        <input type="file" name="xml_file" accept=".xml" required
+                            class="file-input">
+                        <button type="submit" class="btn-secondary">
+                            <i class="fas fa-upload mr-2"></i> Upload
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <!-- Remotes List -->
@@ -29,7 +45,8 @@
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left">Name</th>
-                    <th class="px-6 py-3 text-left">API Key</th>
+                    <th class="px-6 py-3 text-left">Manufacturer</th>
+                    <th class="px-6 py-3 text-left">Type</th>
                     <th class="px-6 py-3 text-left">Commands</th>
                     <th class="px-6 py-3 text-left">Actions</th>
                 </tr>
@@ -38,7 +55,8 @@
                 {% for remote in remotes %}
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4">{{ remote.name }}</td>
-                    <td class="px-6 py-4 font-mono text-sm">{{ remote.api_key }}</td>
+                    <td class="px-6 py-4">{{ remote.manufacturer }}</td>
+                    <td class="px-6 py-4">{{ remote.device_type }}</td>
                     <td class="px-6 py-4">{{ remote.command_count }}</td>
                     <td class="px-6 py-4 space-x-2">
                         <button onclick="editRemote('{{ remote.id }}')" class="btn-icon">
@@ -61,11 +79,25 @@
             <h2 id="modalTitle" class="text-xl font-bold mb-4">Add New Remote</h2>
             <form id="remoteForm">
                 <input type="hidden" id="remoteId">
-                <div class="form-group">
-                    <label for="remoteName">Name</label>
-                    <input type="text" id="remoteName" required class="form-input">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-group">
+                        <label for="remoteName">Name</label>
+                        <input type="text" id="remoteName" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="remoteManufacturer">Manufacturer</label>
+                        <input type="text" id="remoteManufacturer" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="remoteType">Device Type</label>
+                        <input type="text" id="remoteType" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="remoteModelNumber">Device Model</label>
+                        <input type="text" id="remoteModelNumber" class="form-input">
+                    </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group mt-4">
                     <label for="remoteDesc">Description</label>
                     <textarea id="remoteDesc" class="form-input"></textarea>
                 </div>
