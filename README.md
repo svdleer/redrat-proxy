@@ -20,6 +20,17 @@ A modern web dashboard for the RedRat IrNetBox - infrared remote control system.
 - 📋 **Command Templates**: Create templates from IRDB files for quick access
 - 📊 **Signal Visualization**: View visual representations of IR signal patterns
 
+## Dashboard
+
+The RedRat Proxy features a modern dashboard built with Tailwind CSS that includes:
+
+- 📊 **Stats Overview**: Real-time counts of remotes, commands, sequences, and schedules
+- 🎮 **Quick Command**: Send IR commands directly from the dashboard
+- 📜 **Recent Commands**: View recent command history with status
+- 📱 **Activity Feed**: Real-time feed of command executions and user actions
+
+![Dashboard Screenshot](dashboard_screenshot.png)
+
 ## Setup
 
 ### Prerequisites
