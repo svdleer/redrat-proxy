@@ -52,15 +52,12 @@ A modern web dashboard for the RedRat IrNetBox - infrared remote control system.
 
 4. Initialize the database
    ```
-   # Option 1: Using Docker (recommended)
-   docker-compose up -d mysql
-   
-   # Option 2: Manual initialization on Windows
+   # On Windows
    mysql -u username -p < mysql_schema.sql
    
-   # Option 3: Manual initialization on Linux/Mac
-   chmod +x init_db_manual.sh
-   ./init_db_manual.sh
+   # On Linux/Mac
+   chmod +x init_db.sh
+   ./init_db.sh
    ./init_db.sh
    ```
 
@@ -86,51 +83,65 @@ The local development setup does not require a virtual environment, although you
 
 ### Docker Deployment
 
-1. Configure environment variables
+1. Ensure Host MySQL is Running
+   Make sure your MySQL server is running on the host machine and is accessible.
+   ```
+   # On Windows
+   net start mysql
+   
+   # On Linux
+   sudo systemctl status mysql
+   ```
+
+2. Configure environment variables
    Copy the example env file and modify it:
    ```
    cp .env.example .env
    # Edit .env with your preferred settings
    ```
 
-2. Start the containers
+3. Initialize the Database
    ```
-   # Start both MySQL and web application
+   # On Windows
+   mysql -u username -p < mysql_schema.sql
+   
+   # On Linux/Mac
+   chmod +x init_db.sh
+   ./init_db.sh
+   ```
+
+4. Start the web application container
+   ```
+   # Start the web application
    docker-compose up -d
    
    # If you want to see the logs
    docker-compose logs -f
    ```
 
-3. Database Initialization
-   The database schema will be automatically initialized when the web container starts up. The initialization process includes:
+5. Database Connection Verification
+   The container will verify database connectivity on startup and attempt to:
    
-   - Waiting for the MySQL service to be available
-   - Creating the database if it doesn't exist
-   - Creating all required tables from the mysql_schema.sql file
-   - Adding a default admin user if none exists
+   - Connect to the host's MySQL service
+   - Create the database if it doesn't exist
+   - Create all required tables from the mysql_schema.sql file if they don't exist
+   - Check for the default admin user
    
-4. Verify database initialization
-   ```
-   # Run the database health check script
-   python check_db_health.py
-   
-   # Or check directly in MySQL
-   docker-compose exec mysql mysql -u redrat -predratpass redrat_proxy -e "SHOW TABLES;"
-   ```
-
-5. Troubleshooting database issues
-   If the database isn't initializing properly:
+6. Troubleshooting database issues
+   If the database connection fails:
    
    ```
    # Check container logs
    docker-compose logs web
    
-   # Restart the initialization process
-   docker-compose restart web
+   # Make sure your host MySQL is running and accessible
+   mysql -u username -p -e "SHOW DATABASES;"
    
-   # Manual database initialization
-   docker-compose exec web /bin/bash -c "source /app/venv/bin/activate && python -c 'from app.app import init_db; init_db()'"
+   # Check that the host.docker.internal DNS resolution works from the container
+   docker-compose exec web ping -c 4 host.docker.internal
+   
+   # Restart the web service
+   docker-compose restart web
    ```
 
 This will start the Flask application in a container. The application will:

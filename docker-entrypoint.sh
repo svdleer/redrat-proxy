@@ -11,8 +11,8 @@ python --version
 # Print Flask version
 echo "Flask version: $(pip show flask | grep Version)"
 
-# Wait for MySQL to be ready
-echo "Waiting for MySQL to be ready..."
+# Wait for host's MySQL to be ready
+echo "Waiting for MySQL on host.docker.internal to be ready..."
 MAX_RETRIES=30
 RETRY_INTERVAL=5
 RETRY_COUNT=0
@@ -24,7 +24,7 @@ import os
 import sys
 try:
     conn = mysql.connector.connect(
-        host=os.getenv('MYSQL_HOST', 'mysql'),
+        host=os.getenv('MYSQL_HOST', 'host.docker.internal'),
         user=os.getenv('MYSQL_USER', 'redrat'),
         password=os.getenv('MYSQL_PASSWORD', 'redratpass'),
         port=int(os.getenv('MYSQL_PORT', '3306'))
@@ -37,10 +37,10 @@ except Exception as e:
     sys.exit(1)
 EOF
     then
-        echo "MySQL is ready!"
+        echo "MySQL on host is ready!"
         break
     else
-        echo "Waiting for MySQL... Retry $((RETRY_COUNT+1))/$MAX_RETRIES"
+        echo "Waiting for MySQL on host... Retry $((RETRY_COUNT+1))/$MAX_RETRIES"
         RETRY_COUNT=$((RETRY_COUNT+1))
         sleep $RETRY_INTERVAL
     fi
@@ -63,7 +63,7 @@ def create_database():
     try:
         # First connect without specifying database to create it if needed
         conn = mysql.connector.connect(
-            host=os.getenv('MYSQL_HOST', 'mysql'),
+            host=os.getenv('MYSQL_HOST', 'host.docker.internal'),
             user=os.getenv('MYSQL_USER', 'redrat'),
             password=os.getenv('MYSQL_PASSWORD', 'redratpass'),
             port=int(os.getenv('MYSQL_PORT', '3306'))
@@ -80,17 +80,30 @@ def create_database():
         
         # Read schema file
         with open('/app/mysql_schema.sql', 'r') as f:
+            sql_file = f.read()
+            # Remove CREATE DATABASE and USE statements from the schema
+            lines = []
+            for line in sql_file.split('\n'):
+                if not line.strip().lower().startswith('create database') and not line.strip().lower().startswith('use'):
+                    lines.append(line)
+            
+            # Join all non-skipped lines back together
+            modified_sql = '\n'.join(lines)
+            
             # Split SQL file into separate statements
-            sql_statements = f.read().split(';')
+            sql_statements = modified_sql.split(';')
             
             # Execute each statement
             for statement in sql_statements:
                 if statement.strip():  # Skip empty statements
-                    if not statement.lower().strip().startswith('create database') and not statement.lower().strip().startswith('use'):
-                        # Skip create database and use statements as we already did that
+                    try:
                         print(f"Executing: {statement[:50]}...")
                         cursor.execute(statement)
                         conn.commit()
+                    except Exception as stmt_err:
+                        print(f"Error executing statement: {stmt_err}")
+                        # Continue with next statement rather than failing completely
+                        # This allows tables that already exist to be skipped
         
         cursor.close()
         conn.close()
@@ -121,7 +134,7 @@ import mysql.connector
 
 try:
     conn = mysql.connector.connect(
-        host=os.getenv('MYSQL_HOST', 'mysql'),
+        host=os.getenv('MYSQL_HOST', 'host.docker.internal'),
         user=os.getenv('MYSQL_USER', 'redrat'),
         password=os.getenv('MYSQL_PASSWORD', 'redratpass'),
         database=os.getenv('MYSQL_DB', 'redrat_proxy'),
@@ -129,14 +142,27 @@ try:
     )
     cursor = conn.cursor()
     
-    # Test by checking if users table exists and has admin user
-    cursor.execute("SELECT COUNT(*) FROM users WHERE username='admin'")
-    count = cursor.fetchone()[0]
+    # Check if tables exist
+    cursor.execute("SHOW TABLES")
+    tables = cursor.fetchall()
+    print(f"Found {len(tables)} tables in the database:")
+    for table in tables:
+        print(f"- {table[0]}")
     
-    if count > 0:
-        print("✅ Database is properly initialized with admin user")
+    # Test by checking if users table exists
+    cursor.execute("SHOW TABLES LIKE 'users'")
+    users_table_exists = cursor.fetchone() is not None
+    
+    if users_table_exists:
+        # Check for admin user
+        cursor.execute("SELECT COUNT(*) FROM users WHERE username='admin'")
+        count = cursor.fetchone()[0]
+        if count > 0:
+            print("✅ Database is properly initialized with admin user")
+        else:
+            print("⚠️ Admin user not found in database")
     else:
-        print("⚠️ Admin user not found in database")
+        print("❌ Users table not found in database")
     
     cursor.close()
     conn.close()

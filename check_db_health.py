@@ -14,7 +14,7 @@ load_dotenv()
 
 # Database configuration
 DB_CONFIG = {
-    'host': os.getenv('MYSQL_HOST', 'localhost'),
+    'host': os.getenv('MYSQL_HOST', 'host.docker.internal'),
     'port': int(os.getenv('MYSQL_PORT', '3306')),
     'user': os.getenv('MYSQL_USER', 'redrat'),
     'password': os.getenv('MYSQL_PASSWORD', 'redratpass'),

@@ -4,45 +4,27 @@ version: '3.8'
 # See the apache/redrat.conf file for an example reverse proxy configuration.
 
 services:
-  mysql:
-    image: mysql:8.0
-    environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
-      - MYSQL_DATABASE=${MYSQL_DB:-redrat_proxy}
-      - MYSQL_USER=${MYSQL_USER:-redrat}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-redratpass}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-    ports:
-      # Expose MySQL port for development/debugging purposes - optional
-      - "127.0.0.1:3307:3306"
-
   web:
     build: .
     env_file: .env
-    depends_on:
-      - mysql
     volumes:
       # Mount code and config files
       - ./app:/app/app  # The app package
       - ./app.py:/app/app.py  # The main entry point
       - ./requirements.txt:/app/requirements.txt  # Dependencies
       - ./mysql_schema.sql:/app/mysql_schema.sql  # Database schema
-      - ./wait-for-it.sh:/app/wait-for-it.sh  # Wait script
       
       # Mount data directories
       - ./data/uploads:/app/app/static/uploads  # For persistent uploads
       - ./data/remote_images:/app/app/static/remote_images  # For remote images
     ports:
       - "127.0.0.1:5000:5000"  # Only expose to localhost - connect to this from your reverse proxy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # For host MySQL access
     environment:
-      - MYSQL_HOST=mysql  # Connect to MySQL service
-      - MYSQL_PORT=3306
+      - MYSQL_HOST=host.docker.internal  # Connect to host's MySQL
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      # You may need to adjust these values based on your host MySQL configuration
       - MYSQL_USER=${MYSQL_USER:-redrat}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-redratpass}
       - MYSQL_DB=${MYSQL_DB:-redrat_proxy}  # Match the database name in mysql_schema.sql
@@ -51,7 +33,3 @@ services:
       - REDRAT_XMLRPC_URL=${REDRAT_XMLRPC_URL:-http://localhost:8000/RPC2}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     restart: unless-stopped
-    command: bash -c "chmod +x /app/wait-for-it.sh && /app/wait-for-it.sh mysql:3306 -t 60 -- /app/venv/bin/python app.py"
-
-volumes:
-  mysql_data: # Persistent volume for MySQL data
