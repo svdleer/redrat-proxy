@@ -34,13 +34,10 @@ EXPOSE 5000
 # Verify installed packages for debugging
 RUN . venv/bin/activate && pip list
 
-# Add entrypoint script and helper scripts
-COPY docker-entrypoint.sh /usr/local/bin/
-COPY wait-for-it.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/wait-for-it.sh
+# Add entrypoint script to the container
+COPY docker-entrypoint.sh /app/
+RUN chmod +x /app/docker-entrypoint.sh
 
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-
-# Use the virtual environment's Python and Gunicorn
-# Run the application using the top-level app.py file
+# Default command runs the app directly
+# The docker-compose.yml will override this to use the entrypoint script
 CMD ["/app/venv/bin/python", "app.py"]
