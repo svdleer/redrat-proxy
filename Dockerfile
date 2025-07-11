@@ -34,9 +34,10 @@ EXPOSE 5000
 # Verify installed packages for debugging
 RUN . venv/bin/activate && pip list
 
-# Add entrypoint script and make it executable
+# Add entrypoint script and helper scripts
 COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+COPY wait-for-it.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/wait-for-it.sh
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 

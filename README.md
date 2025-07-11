@@ -41,13 +41,26 @@ A modern web dashboard for the RedRat IrNetBox - infrared remote control system.
    pip install -r requirements.txt
    ```
 
-3. Initialize the database
+3. Configure environment variables
    ```
-   # On Windows
+   # Copy the example environment file
+   cp .env.example .env
+   
+   # Edit the .env file with your settings
+   # Especially the MYSQL_USER, MYSQL_PASSWORD, and SECRET_KEY
+   ```
+
+4. Initialize the database
+   ```
+   # Option 1: Using Docker (recommended)
+   docker-compose up -d mysql
+   
+   # Option 2: Manual initialization on Windows
    mysql -u username -p < mysql_schema.sql
    
-   # On Linux/Mac
-   chmod +x init_db.sh
+   # Option 3: Manual initialization on Linux/Mac
+   chmod +x init_db_manual.sh
+   ./init_db_manual.sh
    ./init_db.sh
    ```
 
@@ -74,16 +87,50 @@ The local development setup does not require a virtual environment, although you
 ### Docker Deployment
 
 1. Configure environment variables
-   Create a `.env` file in the project root with your MySQL connection details:
+   Copy the example env file and modify it:
    ```
-   MYSQL_USER=your_mysql_user
-   MYSQL_PASSWORD=your_mysql_password
-   MYSQL_DB=redrat_proxy
+   cp .env.example .env
+   # Edit .env with your preferred settings
    ```
 
-2. Start the container
+2. Start the containers
    ```
+   # Start both MySQL and web application
    docker-compose up -d
+   
+   # If you want to see the logs
+   docker-compose logs -f
+   ```
+
+3. Database Initialization
+   The database schema will be automatically initialized when the web container starts up. The initialization process includes:
+   
+   - Waiting for the MySQL service to be available
+   - Creating the database if it doesn't exist
+   - Creating all required tables from the mysql_schema.sql file
+   - Adding a default admin user if none exists
+   
+4. Verify database initialization
+   ```
+   # Run the database health check script
+   python check_db_health.py
+   
+   # Or check directly in MySQL
+   docker-compose exec mysql mysql -u redrat -predratpass redrat_proxy -e "SHOW TABLES;"
+   ```
+
+5. Troubleshooting database issues
+   If the database isn't initializing properly:
+   
+   ```
+   # Check container logs
+   docker-compose logs web
+   
+   # Restart the initialization process
+   docker-compose restart web
+   
+   # Manual database initialization
+   docker-compose exec web /bin/bash -c "source /app/venv/bin/activate && python -c 'from app.app import init_db; init_db()'"
    ```
 
 This will start the Flask application in a container. The application will:
