@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS irdb_files (
+CREATE TABLE IF NOT EXISTS remote_files (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     filename VARCHAR(255) NOT NULL,
@@ -94,13 +94,13 @@ CREATE TABLE IF NOT EXISTS schedules (
 
 CREATE TABLE IF NOT EXISTS command_templates (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    irdb_id INT NOT NULL,
+    file_id INT NOT NULL,
     name VARCHAR(255) NOT NULL,
     device_type VARCHAR(255),
     template_data JSON NOT NULL,
     created_by INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (irdb_id) REFERENCES irdb_files(id) ON DELETE CASCADE,
+    FOREIGN KEY (file_id) REFERENCES remote_files(id) ON DELETE CASCADE,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
 );
 

@@ -163,30 +163,30 @@ def import_remotes_to_db(remotes):
             
             # Create a filename based on the remote name
             filename = f"{remote['name'].replace(' ', '_')}.xml"
-            filepath = f"static/irdb_files/{filename}"
+            filepath = f"static/remote_files/{filename}"
             
             # Make sure the directory exists
-            os.makedirs("app/static/irdb_files", exist_ok=True)
+            os.makedirs("app/static/remote_files", exist_ok=True)
             
             # Write the signal data to a file
             with open(f"app/{filepath}", 'w') as f:
                 f.write(signals_data)
             
-            # Add the IRDB file to the database
-            cursor.execute("SELECT id FROM irdb_files WHERE filename = %s", (filename,))
+            # Add the remote file to the database
+            cursor.execute("SELECT id FROM remote_files WHERE filename = %s", (filename,))
             result = cursor.fetchone()
             
             if result:
-                irdb_id = result[0]
-                print(f"IRDB file '{filename}' already exists with ID {irdb_id}")
+                file_id = result[0]
+                print(f"Remote file '{filename}' already exists with ID {file_id}")
             else:
                 cursor.execute(
-                    "INSERT INTO irdb_files (name, filename, filepath, device_type, uploaded_by) VALUES (%s, %s, %s, %s, %s)",
+                    "INSERT INTO remote_files (name, filename, filepath, device_type, uploaded_by) VALUES (%s, %s, %s, %s, %s)",
                     (remote['name'], filename, filepath, remote['device_type'], admin_id)
                 )
-                irdb_id = cursor.lastrowid
+                file_id = cursor.lastrowid
                 conn.commit()
-                print(f"Created new IRDB file '{filename}' with ID {irdb_id}")
+                print(f"Created new remote file '{filename}' with ID {file_id}")
             
             # Create command templates from the signals
             for signal in remote['signals']:
@@ -202,8 +202,8 @@ def import_remotes_to_db(remotes):
                 }
                 
                 cursor.execute(
-                    "SELECT id FROM command_templates WHERE name = %s AND irdb_id = %s",
-                    (signal['name'], irdb_id)
+                    "SELECT id FROM command_templates WHERE name = %s AND file_id = %s",
+                    (signal['name'], file_id)
                 )
                 result = cursor.fetchone()
                 
@@ -218,9 +218,9 @@ def import_remotes_to_db(remotes):
                     # Create new template
                     cursor.execute(
                         """INSERT INTO command_templates 
-                           (irdb_id, name, device_type, template_data, created_by) 
+                           (file_id, name, device_type, template_data, created_by) 
                            VALUES (%s, %s, %s, %s, %s)""",
-                        (irdb_id, signal['name'], remote['device_type'], json.dumps(template_data), admin_id)
+                        (file_id, signal['name'], remote['device_type'], json.dumps(template_data), admin_id)
                     )
                     print(f"Created command template '{signal['name']}' for remote '{remote['name']}'")
                 

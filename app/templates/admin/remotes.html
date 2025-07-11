@@ -9,34 +9,18 @@
         </button>
     </div>
 
-    <!-- IRDB & XML File Upload -->
+    <!-- XML File Upload -->
     <div class="bg-white rounded-lg shadow p-6 mb-8">
-        <div class="grid md:grid-cols-2 gap-6">
-            <div>
-                <h2 class="text-xl font-semibold mb-4">Upload IRDB File</h2>
-                <form id="irdbUploadForm" enctype="multipart/form-data">
-                    <div class="flex items-center space-x-4">
-                        <input type="file" name="irdb_file" accept=".irdb" required
-                            class="file-input">
-                        <button type="submit" class="btn-secondary">
-                            <i class="fas fa-upload mr-2"></i> Upload
-                        </button>
-                    </div>
-                </form>
+        <h2 class="text-xl font-semibold mb-4">Upload Remotes XML</h2>
+        <form id="xmlUploadForm" enctype="multipart/form-data">
+            <div class="flex items-center space-x-4">
+                <input type="file" name="xml_file" accept=".xml" required
+                    class="file-input">
+                <button type="submit" class="btn-secondary">
+                    <i class="fas fa-upload mr-2"></i> Upload
+                </button>
             </div>
-            <div>
-                <h2 class="text-xl font-semibold mb-4">Upload Remotes XML</h2>
-                <form id="xmlUploadForm" enctype="multipart/form-data">
-                    <div class="flex items-center space-x-4">
-                        <input type="file" name="xml_file" accept=".xml" required
-                            class="file-input">
-                        <button type="submit" class="btn-secondary">
-                            <i class="fas fa-upload mr-2"></i> Upload
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+        </form>
     </div>
 
     <!-- Remotes List -->

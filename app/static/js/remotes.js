@@ -1,7 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Remote form handling
     const remoteForm = document.getElementById('remoteForm');
-    const irdbForm = document.getElementById('irdbUploadForm');
     const xmlForm = document.getElementById('xmlUploadForm');
     
     if (remoteForm) {
@@ -32,32 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 console.error('Error saving remote:', error);
                 alert('Error saving remote');
-            }
-        });
-    }
-    
-    if (irdbForm) {
-        irdbForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(irdbForm);
-            
-            try {
-                const response = await fetch('/api/irdb', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    },
-                    body: formData
-                });
-                
-                if (response.ok) {
-                    window.location.reload();
-                } else {
-                    alert('Error uploading IRDB file');
-                }
-            } catch (error) {
-                console.error('Error uploading IRDB:', error);
-                alert('Error uploading IRDB file');
             }
         });
     }

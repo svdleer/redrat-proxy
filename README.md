@@ -8,7 +8,7 @@ A modern web dashboard for the RedRat IrNetBox - infrared remote control system.
 - 📱 Responsive UI built with Tailwind CSS
 - 🎮 Manage remote controls
 - 📊 Command history tracking
-- 🔍 IRDB file management
+- 🔍 Remote XML file management
 - 👥 User management with admin controls
 - 📤 XML Import for remotes and signals
 
@@ -18,7 +18,7 @@ A modern web dashboard for the RedRat IrNetBox - infrared remote control system.
 - 🔄 **Command Sequences**: Queue multiple commands in a row and save as reusable macros
 - 📊 **Visual Dashboard**: Monitoring interface for command execution status
 - 📱 **Direct Control Interface**: Send immediate IR commands to devices
-- 📋 **Command Templates**: Create templates from IRDB files for quick access
+- 📋 **Command Templates**: Create templates from XML files for quick access
 - 📊 **Signal Visualization**: View visual representations of IR signal patterns
 - 📤 **XML Import**: Import remotes from RedRat XML files
 
@@ -102,3 +102,5 @@ The `config_data` field stores additional configuration parameters from the XML 
 ### Command Templates
 
 When importing remotes from XML, the system automatically creates command templates for each signal. These templates are used to send commands to the RedRat IrNetBox.
+
+Note: Support for .irdb files has been removed in favor of XML-only imports.
