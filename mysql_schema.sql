@@ -36,7 +36,6 @@ CREATE TABLE IF NOT EXISTS remote_files (
     filename VARCHAR(255) NOT NULL,
     filepath VARCHAR(255) NOT NULL,
     device_type VARCHAR(255),
-    manufacturer VARCHAR(255),
     uploaded_by INT NOT NULL,
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE CASCADE

@@ -7,9 +7,9 @@ from datetime import datetime
 from typing import Dict, Any
 
 class CommandTemplate:
-    def __init__(self, id=None, file_id=None, name=None, template_data=None, created_at=None):
+    def __init__(self, id=None, irdb_id=None, name=None, template_data=None, created_at=None):
         self.id = id or str(uuid.uuid4())
-        self.file_id = file_id
+        self.irdb_id = irdb_id
         self.name = name
         self.template_data = template_data or {}
         self.created_at = created_at or datetime.now()
@@ -25,7 +25,7 @@ class CommandTemplate:
         
         return cls(
             id=row['id'],
-            file_id=row['file_id'],
+            irdb_id=row['irdb_id'],
             name=row['name'],
             template_data=template_data,
             created_at=row['created_at']
@@ -35,7 +35,7 @@ class CommandTemplate:
         """Convert to a dictionary for API responses"""
         return {
             'id': self.id,
-            'file_id': self.file_id,
+            'irdb_id': self.irdb_id,
             'name': self.name,
             'template_data': self.template_data,
             'created_at': self.created_at.isoformat() if isinstance(self.created_at, datetime) else self.created_at

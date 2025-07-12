@@ -11,17 +11,17 @@ templates_bp = Blueprint('templates', __name__)
 @templates_bp.route('/api/templates', methods=['GET'])
 @login_required
 def get_templates():
-    """Get templates by remote file ID"""
-    file_id = request.args.get('file_id')
+    """Get templates by IRDB ID"""
+    irdb_id = request.args.get('irdb_id')
     
-    if not file_id:
+    if not irdb_id:
         return jsonify({
             'success': False,
-            'message': "Remote file ID is required"
+            'message': "IRDB ID is required"
         }), 400
     
     try:
-        templates = TemplateService.get_templates_by_file(file_id)
+        templates = TemplateService.get_templates_by_irdb(irdb_id)
         return jsonify({
             'success': True,
             'templates': [template.to_dict() for template in templates]
@@ -39,18 +39,18 @@ def create_template():
     """Create a new command template"""
     data = request.json
     
-    if not data or 'file_id' not in data or 'name' not in data or 'template_data' not in data:
+    if not data or 'irdb_id' not in data or 'name' not in data or 'template_data' not in data:
         return jsonify({
             'success': False,
-            'message': "Remote file ID, name and template_data are required"
+            'message': "IRDB ID, name and template_data are required"
         }), 400
     
-    file_id = data['file_id']
+    irdb_id = data['irdb_id']
     name = data['name']
     template_data = data['template_data']
     
     try:
-        template = TemplateService.create_template(file_id, name, template_data)
+        template = TemplateService.create_template(irdb_id, name, template_data)
         return jsonify({
             'success': True,
             'template': template.to_dict()
@@ -145,30 +145,30 @@ def delete_template(template_id):
             'message': f"Failed to delete template: {str(e)}"
         }), 500
 
-@templates_bp.route('/api/remote-files/<file_id>/extract-templates', methods=['POST'])
+@templates_bp.route('/api/irdb/<irdb_id>/extract-templates', methods=['POST'])
 @login_required
-def extract_templates(file_id):
-    """Extract templates from an XML remote file"""
+def extract_templates(irdb_id):
+    """Extract templates from an IRDB file"""
     try:
-        # First get the remote file path
-        from app.models.remote_file import RemoteFile
+        # First get the IRDB file path
+        from app.models.irdb import IRDBFile
         from app.database import get_db
         
         with get_db() as conn:
             cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM remote_files WHERE id = %s", (file_id,))
+            cursor.execute("SELECT * FROM irdb_files WHERE id = %s", (irdb_id,))
             row = cursor.fetchone()
             
             if not row:
                 return jsonify({
                     'success': False,
-                    'message': "Remote file not found"
+                    'message': "IRDB file not found"
                 }), 404
             
-            remote_file = RemoteFile.from_db_row(row)
+            irdb_file = IRDBFile.from_db_row(row)
             
             # Extract templates
-            templates = TemplateService.extract_templates_from_xml(file_id, remote_file.filepath)
+            templates = TemplateService.extract_templates_from_irdb(irdb_id, irdb_file.filepath)
             
             return jsonify({
                 'success': True,
@@ -176,7 +176,7 @@ def extract_templates(file_id):
                 'templates': [template.to_dict() for template in templates]
             }), 200
     except Exception as e:
-        logger.error(f"Error extracting templates from remote file {file_id}: {e}")
+        logger.error(f"Error extracting templates from IRDB {irdb_id}: {e}")
         return jsonify({
             'success': False,
             'message': f"Failed to extract templates: {str(e)}"

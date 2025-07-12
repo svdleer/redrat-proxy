@@ -181,8 +181,8 @@ def import_remotes_to_db(remotes):
                 print(f"Remote file '{filename}' already exists with ID {file_id}")
             else:
                 cursor.execute(
-                    "INSERT INTO remote_files (name, filename, filepath, device_type, manufacturer, uploaded_by) VALUES (%s, %s, %s, %s, %s, %s)",
-                    (remote['name'], filename, filepath, remote['device_type'], remote['manufacturer'], admin_id)
+                    "INSERT INTO remote_files (name, filename, filepath, device_type, uploaded_by) VALUES (%s, %s, %s, %s, %s)",
+                    (remote['name'], filename, filepath, remote['device_type'], admin_id)
                 )
                 file_id = cursor.lastrowid
                 conn.commit()

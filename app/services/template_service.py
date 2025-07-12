@@ -12,10 +12,10 @@ from app.models.template import CommandTemplate
 
 class TemplateService:
     @staticmethod
-    def create_template(file_id: str, name: str, template_data: Dict[str, Any]) -> CommandTemplate:
-        """Create a new command template from remote file data"""
+    def create_template(irdb_id: str, name: str, template_data: Dict[str, Any]) -> CommandTemplate:
+        """Create a new command template from IRDB data"""
         template = CommandTemplate(
-            file_id=file_id,
+            irdb_id=irdb_id,
             name=name,
             template_data=template_data
         )
@@ -23,13 +23,13 @@ class TemplateService:
         with get_db() as conn:
             conn.execute("""
                 INSERT INTO command_templates
-                (id, file_id, name, template_data, created_at)
+                (id, irdb_id, name, template_data, created_at)
                 VALUES (%s, %s, %s, %s, %s)
-            """, (template.id, template.file_id, template.name, 
+            """, (template.id, template.irdb_id, template.name, 
                   json.dumps(template.template_data), template.created_at))
             conn.commit()
             
-        logger.info(f"Template created: {name} from remote file {file_id}")
+        logger.info(f"Template created: {name} from IRDB {irdb_id}")
         return template
     
     @staticmethod
@@ -48,16 +48,16 @@ class TemplateService:
             return CommandTemplate.from_db_row(row)
     
     @staticmethod
-    def get_templates_by_file(file_id: str) -> List[CommandTemplate]:
-        """Get all templates for a remote file"""
+    def get_templates_by_irdb(irdb_id: str) -> List[CommandTemplate]:
+        """Get all templates for an IRDB file"""
         templates = []
         
         with get_db() as conn:
             cursor = conn.cursor(dictionary=True)
             cursor.execute("""
                 SELECT * FROM command_templates
-                WHERE file_id = %s
-            """, (file_id,))
+                WHERE irdb_id = %s
+            """, (irdb_id,))
             
             rows = cursor.fetchall()
             
@@ -67,10 +67,10 @@ class TemplateService:
         return templates
     
     @staticmethod
-    def extract_templates_from_xml(file_id: str, xml_file_path: str) -> List[CommandTemplate]:
-        """Extract command templates from an XML remote file"""
+    def extract_templates_from_irdb(irdb_id: str, irdb_file_path: str) -> List[CommandTemplate]:
+        """Extract command templates from an IRDB file"""
         # This is a placeholder - in a real implementation, you'd need to
-        # parse the XML file format and extract signal patterns
+        # parse the IRDB file format and extract signal patterns
         
         # For now, we'll create a dummy template
         template_data = {
@@ -80,8 +80,8 @@ class TemplateService:
         }
         
         template = TemplateService.create_template(
-            file_id=file_id,
-            name=f"Template from {os.path.basename(xml_file_path)}",
+            irdb_id=irdb_id,
+            name=f"Template from {os.path.basename(irdb_file_path)}",
             template_data=template_data
         )
         

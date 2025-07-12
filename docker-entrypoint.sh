@@ -85,7 +85,7 @@ def recreate_all_tables(cursor):
         tables_to_drop = [
             "sessions", "command_templates", "scheduled_tasks", 
             "sequence_commands", "command_sequences", "commands",
-            "remote_files", "users", "remotes"
+            "irdb_files", "users", "remotes"
         ]
         
         for table in tables_to_drop:
@@ -133,21 +133,16 @@ def recreate_all_tables(cursor):
         """)
         print("✓ Created sessions table")
         
-        # Create remote_files table
+        # Create irdb_files table
         cursor.execute("""
-        CREATE TABLE remote_files (
+        CREATE TABLE irdb_files (
             id VARCHAR(36) PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
             filename VARCHAR(255) NOT NULL,
-            filepath VARCHAR(255),
-            device_type VARCHAR(255),
-            manufacturer VARCHAR(255),
-            uploaded_by VARCHAR(36) NOT NULL,
-            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE CASCADE
+            filepath VARCHAR(255) NOT NULL,
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
-        print("✓ Created remote_files table")
+        print("✓ Created irdb_files table")
         
         # Create commands table
         cursor.execute("""
@@ -210,14 +205,11 @@ def recreate_all_tables(cursor):
         cursor.execute("""
         CREATE TABLE command_templates (
             id VARCHAR(36) PRIMARY KEY,
-            file_id VARCHAR(36) NOT NULL,
+            irdb_id VARCHAR(36) NOT NULL,
             name VARCHAR(255) NOT NULL,
-            device_type VARCHAR(255),
             template_data JSON NOT NULL,
-            created_by VARCHAR(36) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (file_id) REFERENCES remote_files(id) ON DELETE CASCADE,
-            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+            FOREIGN KEY (irdb_id) REFERENCES irdb_files(id) ON DELETE CASCADE
         )
         """)
         print("✓ Created command_templates table")
@@ -325,7 +317,7 @@ def create_database():
         # Final verification of all tables
         cursor.execute("SHOW TABLES")
         final_tables = [t[0] for t in cursor.fetchall()]
-        expected_tables = ['remotes', 'users', 'sessions', 'remote_files', 'commands',
+        expected_tables = ['remotes', 'users', 'sessions', 'irdb_files', 'commands',
                            'command_sequences', 'sequence_commands', 'scheduled_tasks', 'command_templates']
         
         missing_tables = [t for t in expected_tables if t not in final_tables]
@@ -409,10 +401,6 @@ except Exception as e:
     print(f"❌ Failed to connect to application database: {e}")
     sys.exit(1)
 EOF
-
-# Create required directories
-mkdir -p /app/app/static/remote_files
-mkdir -p /app/app/static/images/remotes
 
 echo "Starting the application..."
 exec "$@"

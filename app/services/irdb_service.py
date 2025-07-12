@@ -57,9 +57,9 @@ class IRDBService:
                 else:
                     cursor.execute(
                         """INSERT INTO remote_files 
-                           (name, filename, filepath, manufacturer, device_type, uploaded_by) 
-                           VALUES (%s, %s, %s, %s, %s, %s)""",
-                        (filename, filename, filepath, '', '', user_id)
+                           (name, filename, filepath, uploaded_by) 
+                           VALUES (%s, %s, %s, %s)""",
+                        (filename, filename, filepath, user_id)
                     )
                     file_id = cursor.lastrowid
                     conn.commit()
