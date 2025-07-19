@@ -765,6 +765,48 @@ def get_activity(user):
                 
     return jsonify(activities)
 
+@app.route('/api/activity', methods=['DELETE'])
+@login_required()
+def clear_activity_log(user):
+    """Clear all command history/activity log"""
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM commands")
+            conn.commit()
+            
+        return jsonify({
+            'success': True,
+            'message': 'Activity log cleared successfully'
+        })
+    except Exception as e:
+        logger.error(f"Error clearing activity log: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to clear activity log'
+        }), 500
+
+@app.route('/api/history', methods=['DELETE'])
+@login_required()
+def clear_command_history(user):
+    """Clear recent command history (same as activity log)"""
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM commands")
+            conn.commit()
+            
+        return jsonify({
+            'success': True,
+            'message': 'Command history cleared successfully'
+        })
+    except Exception as e:
+        logger.error(f"Error clearing command history: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to clear command history'
+        }), 500
+
 @app.route('/api/events')
 @login_required()
 def events(user):

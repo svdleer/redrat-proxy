@@ -409,7 +409,7 @@ async function clearActivityLog() {
     
     try {
         const response = await apiCall('/api/activity', { method: 'DELETE' });
-        if (response && response.ok) {
+        if (response) {
             // Clear the activity feed display
             const activityFeed = document.getElementById('activity-feed');
             if (activityFeed) {
@@ -433,7 +433,7 @@ async function clearRecentCommands() {
     
     try {
         const response = await apiCall('/api/history', { method: 'DELETE' });
-        if (response && response.ok) {
+        if (response) {
             // Clear the recent commands display
             const recentCommands = document.getElementById('recent-commands');
             if (recentCommands) {
