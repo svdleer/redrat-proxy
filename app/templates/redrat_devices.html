@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}RedRat Devices{% endblock %}
+
+{% block extra_head %}
+<style>
+  .device-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .device-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+  .status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+  }
+  .status-online { background-color: #10b981; }
+  .status-offline { background-color: #ef4444; }
+  .status-error { background-color: #f59e0b; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+  <div class="mb-8 flex justify-between items-center">
+    <h1 class="text-3xl font-bold text-gray-800">RedRat Devices</h1>
+    <button onclick="showAddDeviceModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+      <i class="fas fa-plus mr-2"></i>Add Device
+    </button>
+  </div>
+
+  <!-- Devices Grid -->
+  <div id="devicesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- Devices will be loaded here -->
+  </div>
+
+  <!-- Add Device Modal -->
+  <div id="addDeviceModal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="text-xl font-bold text-gray-800">Add RedRat Device</h2>
+        <button onclick="closeAddDeviceModal()" class="text-gray-400 hover:text-gray-600">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <form id="addDeviceForm" class="modal-body">
+        <div class="space-y-4">
+          <div>
+            <label for="deviceName" class="block text-sm font-medium text-gray-700 mb-1">Device Name</label>
+            <input type="text" id="deviceName" name="name" placeholder="e.g., Living Room RedRat" class="form-input" required>
+          </div>
+          
+          <div>
+            <label for="deviceIp" class="block text-sm font-medium text-gray-700 mb-1">IP Address</label>
+            <input type="text" id="deviceIp" name="ip_address" placeholder="192.168.1.100" class="form-input" required>
+          </div>
+          
+          <div>
+            <label for="devicePort" class="block text-sm font-medium text-gray-700 mb-1">Port</label>
+            <input type="number" id="devicePort" name="port" value="10001" min="1" max="65535" class="form-input">
+          </div>
+          
+          <div>
+            <label for="deviceDescription" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea id="deviceDescription" name="description" placeholder="Device description" class="form-input" rows="3"></textarea>
+          </div>
+        </div>
+      </form>
+      
+      <div class="modal-footer">
+        <button type="button" onclick="closeAddDeviceModal()" class="btn btn-secondary">Cancel</button>
+        <button type="submit" form="addDeviceForm" class="btn btn-primary">
+          <i class="fas fa-plus mr-2"></i>Add Device
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Device Details Modal -->
+  <div id="deviceModal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="deviceModalTitle" class="text-xl font-bold text-gray-800">Device Details</h2>
+        <button onclick="closeDeviceModal()" class="text-gray-400 hover:text-gray-600">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div id="deviceModalBody" class="modal-body">
+        <!-- Device details will be loaded here -->
+      </div>
+      
+      <div class="modal-footer">
+        <button type="button" onclick="closeDeviceModal()" class="btn btn-secondary">Close</button>
+        <button type="button" onclick="testDevice()" class="btn btn-primary">
+          <i class="fas fa-network-wired mr-2"></i>Test Connection
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/redrat_devices.js') }}"></script>
+{% endblock %}

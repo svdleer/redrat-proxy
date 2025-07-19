@@ -1,0 +1,773 @@
+{% extends "base.html" %}
+
+{% block title %}Command Templates | RedRat Proxy{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">Command Templates</h1>
+        <div class="flex space-x-3">
+            <button id="btn-back-to-remotes" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition items-center hidden">
+                <i class="fas fa-arrow-left mr-2"></i> Back to Remotes
+            </button>
+            {% if user.is_admin %}
+            <button id="btn-new-command" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition flex items-center">
+                <i class="fas fa-plus mr-2"></i> New Command
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <input type="text" id="search-commands" placeholder="Search commands..." class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select id="filter-remote" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Remotes</option>
+                </select>
+            </div>
+        </div>
+        
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remote</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Command</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device Type</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="commands-table-body" class="bg-white divide-y divide-gray-200">
+                <!-- Commands will be loaded here -->
+                <tr>
+                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">Loading commands...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add/Edit Command Modal -->
+<div id="command-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-[600px] shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <h3 class="text-lg font-medium text-gray-900" id="modal-title">Add New Command</h3>
+            <form id="command-form" class="mt-4 space-y-4">
+                <div>
+                    <label for="modal-remote" class="block text-sm font-medium text-gray-700">Remote</label>
+                    <select id="modal-remote" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Select Remote</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="modal-command" class="block text-sm font-medium text-gray-700">Command Name</label>
+                    <input type="text" id="modal-command" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label for="modal-device-type" class="block text-sm font-medium text-gray-700">Device Type</label>
+                    <input type="text" id="modal-device-type" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-sm font-medium text-gray-700">Template Data</label>
+                        <div class="flex space-x-2">
+                            <button type="button" id="btn-load-template" class="px-3 py-1 text-xs bg-green-100 text-green-800 rounded-md hover:bg-green-200">Load Example</button>
+                            <button type="button" id="btn-structured-editor" class="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200">Structured</button>
+                            <button type="button" id="btn-json-editor" class="px-3 py-1 text-xs bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200">JSON</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Structured Editor -->
+                    <div id="structured-editor" class="space-y-3 p-4 bg-gray-50 rounded-lg">
+                        <div class="text-xs text-gray-600 mb-3">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Fill in the fields below to create IR signal template data. All fields are optional except Signal Name.
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label for="signal-name" class="block text-xs font-medium text-gray-700">Signal Name *</label>
+                                <input type="text" id="signal-name" class="mt-1 block w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., power, volume_up, channel_1" required>
+                                <div class="text-xs text-gray-500 mt-1">Human-readable command name</div>
+                            </div>
+                            <div>
+                                <label for="modulation-freq" class="block text-xs font-medium text-gray-700">Modulation Frequency (Hz)</label>
+                                <input type="number" id="modulation-freq" class="mt-1 block w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="36000" min="1000">
+                                <div class="text-xs text-gray-500 mt-1">Typical: 36000, 38000, 40000</div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label for="no-repeats" class="block text-xs font-medium text-gray-700">No. Repeats</label>
+                                <input type="number" id="no-repeats" class="mt-1 block w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="1" min="1" max="10">
+                                <div class="text-xs text-gray-500 mt-1">How many times to repeat signal</div>
+                            </div>
+                            <div>
+                                <label for="intra-sig-pause" class="block text-xs font-medium text-gray-700">Intra Signal Pause (ms)</label>
+                                <input type="number" id="intra-sig-pause" step="any" class="mt-1 block w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="90.57" min="0">
+                                <div class="text-xs text-gray-500 mt-1">Pause between signal repeats</div>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="sig-data" class="block text-xs font-medium text-gray-700">Signal Data (Base64)</label>
+                            <textarea id="sig-data" rows="2" class="mt-1 block w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 font-mono" placeholder="Base64 encoded IR signal data..."></textarea>
+                            <div class="text-xs text-gray-500 mt-1">Raw IR signal data encoded in Base64 format</div>
+                        </div>
+                        <div>
+                            <label for="lengths" class="block text-xs font-medium text-gray-700">Lengths (comma-separated)</label>
+                            <input type="text" id="lengths" class="mt-1 block w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="0.4025, 0.297, 0.151, 0.631">
+                            <div class="text-xs text-gray-500 mt-1">Timing lengths for signal components (decimal values)</div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-2">Signal Options</label>
+                            <div class="flex flex-wrap gap-4">
+                                <label class="flex items-center text-xs">
+                                    <input type="checkbox" id="double-signals" class="mr-1">
+                                    Double Signals
+                                </label>
+                                <label class="flex items-center text-xs">
+                                    <input type="checkbox" id="keyboard-signals" class="mr-1">
+                                    Keyboard Signals
+                                </label>
+                                <label class="flex items-center text-xs">
+                                    <input type="checkbox" id="xmp1-signals" class="mr-1">
+                                    XMP1 Signals
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- JSON Editor -->
+                    <div id="json-editor" class="hidden">
+                        <div class="text-xs text-gray-600 mb-2">
+                            <i class="fas fa-code mr-1"></i>
+                            Edit the JSON template data directly. The JSON will be validated automatically.
+                        </div>
+                        <textarea id="modal-template-data" rows="10" class="mt-1 block w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 font-mono bg-gray-50" placeholder='{"IRPacket": {"Name": "power", "ModulationFreq": 36000, ...}}'></textarea>
+                        <div id="json-validation" class="mt-2 p-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded hidden">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                            <span id="json-error-message"></span>
+                        </div>
+                        <div class="mt-2 text-xs text-gray-500">
+                            <i class="fas fa-lightbulb mr-1"></i>
+                            <strong>Tip:</strong> Use the "Load Example" button to see a valid JSON structure, then modify as needed.
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-2">
+                    <button type="button" id="cancel-command" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancel</button>
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Pass user information from Flask to JavaScript
+const userIsAdmin = {{ 'true' if user.is_admin else 'false' }};
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadCommands();
+    loadRemotes();
+    
+    // Check for remote parameter in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const remoteId = urlParams.get('remote');
+    
+    // Event listeners
+    const newCommandBtn = document.getElementById('btn-new-command');
+    if (newCommandBtn) {
+        newCommandBtn.addEventListener('click', showNewCommandModal);
+    }
+    document.getElementById('btn-back-to-remotes').addEventListener('click', () => {
+        window.location.href = '/admin/remotes';
+    });
+    document.getElementById('cancel-command').addEventListener('click', hideCommandModal);
+    document.getElementById('command-form').addEventListener('submit', saveCommand);
+    document.getElementById('search-commands').addEventListener('input', filterCommands);
+    document.getElementById('filter-remote').addEventListener('change', filterCommands);
+    
+    // Template editor mode switchers
+    document.getElementById('btn-structured-editor').addEventListener('click', switchToStructuredEditor);
+    document.getElementById('btn-json-editor').addEventListener('click', switchToJsonEditor);
+    document.getElementById('btn-load-template').addEventListener('click', loadExampleTemplate);
+    
+    // JSON validation
+    document.getElementById('modal-template-data').addEventListener('input', validateJson);
+    
+    // Structured editor change listeners
+    const structuredFields = ['signal-name', 'modulation-freq', 'no-repeats', 'intra-sig-pause', 'sig-data', 'lengths', 'double-signals', 'keyboard-signals', 'xmp1-signals'];
+    structuredFields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.addEventListener('input', updateJsonFromStructured);
+            field.addEventListener('change', updateJsonFromStructured);
+        }
+    });
+    
+    // Add validation listeners
+    document.getElementById('lengths').addEventListener('blur', validateLengthsInput);
+    document.getElementById('modulation-freq').addEventListener('blur', () => validateNumericInput('modulation-freq', 'Modulation Frequency', 1000));
+    document.getElementById('no-repeats').addEventListener('blur', () => validateNumericInput('no-repeats', 'No. Repeats', 1));
+    document.getElementById('intra-sig-pause').addEventListener('blur', () => validateNumericInput('intra-sig-pause', 'Intra Signal Pause', 0));
+    
+    // If remote ID is provided, set up the filter after remotes are loaded
+    if (remoteId) {
+        // Wait for remotes to load, then apply filter
+        const checkRemotesLoaded = setInterval(() => {
+            const filterSelect = document.getElementById('filter-remote');
+            if (filterSelect.options.length > 1) { // More than just the "All Remotes" option
+                filterSelect.value = remoteId;
+                filterCommands(); // Apply the filter
+                clearInterval(checkRemotesLoaded);
+                
+                // Show a notification that we've filtered by remote
+                showRemoteFilterNotification();
+            }
+        }, 100);
+        
+        // Clear interval after 5 seconds to prevent infinite loop
+        setTimeout(() => clearInterval(checkRemotesLoaded), 5000);
+    }
+});
+
+let allCommands = [];
+let currentEditingCommandId = null;
+let currentEditorMode = 'structured';
+
+function showRemoteFilterNotification() {
+    // Create a temporary notification
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-md shadow-lg z-50';
+    notification.innerHTML = '<i class="fas fa-info-circle mr-2"></i>Filtered by selected remote';
+    document.body.appendChild(notification);
+    
+    // Remove notification after 3 seconds
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+    
+    // Also update the page title to show we're filtering
+    const pageTitle = document.querySelector('h1');
+    if (pageTitle) {
+        const filterSelect = document.getElementById('filter-remote');
+        const selectedOption = filterSelect.options[filterSelect.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+            pageTitle.innerHTML = `Command Templates <span class="text-lg font-normal text-gray-600">- ${selectedOption.text}</span>`;
+        }
+    }
+    
+    // Show the back to remotes button
+    const backButton = document.getElementById('btn-back-to-remotes');
+    if (backButton) {
+        backButton.classList.remove('hidden');
+        backButton.classList.add('flex');
+    }
+}
+
+async function loadCommands() {
+    try {
+        const response = await fetch('/api/command-templates');
+        const commands = await response.json();
+        allCommands = commands;
+        renderCommands(commands);
+    } catch (error) {
+        console.error('Error loading commands:', error);
+        document.getElementById('commands-table-body').innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-red-500">Error loading commands</td></tr>';
+    }
+}
+
+async function loadRemotes() {
+    try {
+        const response = await fetch('/api/remote-files');
+        const files = await response.json();
+        
+        const remoteSelect = document.getElementById('modal-remote');
+        const filterSelect = document.getElementById('filter-remote');
+        
+        files.forEach(file => {
+            const option = new Option(file.name, file.id);
+            remoteSelect.add(option.cloneNode(true));
+            filterSelect.add(option);
+        });
+    } catch (error) {
+        console.error('Error loading remotes:', error);
+    }
+}
+
+function renderCommands(commands) {
+    const tbody = document.getElementById('commands-table-body');
+    tbody.innerHTML = '';
+    
+    if (commands.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">No command templates found</td></tr>';
+        return;
+    }
+    
+    commands.forEach(command => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50';
+        
+        // Create action buttons only if user is admin
+        let actionButtons = '';
+        if (userIsAdmin) {
+            actionButtons = `
+                <button onclick="editCommand(${command.id})" class="text-blue-600 hover:text-blue-900 mr-2">Edit</button>
+                <button onclick="deleteCommand(${command.id})" class="text-red-600 hover:text-red-900">Delete</button>
+            `;
+        } else {
+            actionButtons = '<span class="text-gray-400 text-sm">View only</span>';
+        }
+        
+        row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${command.remote_name}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${command.command_name}</td>
+            <td class="px-6 py-4 text-sm text-gray-500">${command.device_type || ''}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                ${actionButtons}
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function showNewCommandModal() {
+    currentEditingCommandId = null;
+    document.getElementById('modal-title').textContent = 'Add New Command';
+    document.getElementById('command-form').reset();
+    clearTemplateFields();
+    
+    // Pre-select the remote if we're filtering by one
+    const filterSelect = document.getElementById('filter-remote');
+    if (filterSelect.value) {
+        document.getElementById('modal-remote').value = filterSelect.value;
+    }
+    
+    switchToStructuredEditor(); // Default to structured editor
+    document.getElementById('command-modal').classList.remove('hidden');
+}
+
+function hideCommandModal() {
+    currentEditingCommandId = null;
+    document.getElementById('command-modal').classList.add('hidden');
+}
+
+async function saveCommand(e) {
+    e.preventDefault();
+    
+    // Validate JSON if in JSON editor mode
+    if (currentEditorMode === 'json' && !validateJson()) {
+        alert('Please fix the JSON validation errors before saving.');
+        return;
+    }
+    
+    // Update JSON from structured fields if in structured mode
+    if (currentEditorMode === 'structured') {
+        updateJsonFromStructured();
+    }
+    
+    const data = {
+        file_id: parseInt(document.getElementById('modal-remote').value),
+        name: document.getElementById('modal-command').value,
+        device_type: document.getElementById('modal-device-type').value,
+        template_data: document.getElementById('modal-template-data').value
+    };
+    
+    try {
+        let response;
+        if (currentEditingCommandId) {
+            // Update existing command
+            response = await fetch(`/api/command-templates/${currentEditingCommandId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+        } else {
+            // Create new command
+            response = await fetch('/api/command-templates', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+        }
+        
+        if (response.ok) {
+            loadCommands();
+            hideCommandModal();
+        } else {
+            const error = await response.json();
+            alert(error.error || 'Error saving command');
+        }
+    } catch (error) {
+        console.error('Error saving command:', error);
+        alert('Error saving command');
+    }
+}
+
+function filterCommands() {
+    const searchTerm = document.getElementById('search-commands').value.toLowerCase();
+    const selectedRemote = document.getElementById('filter-remote').value;
+    
+    let filteredCommands = allCommands;
+    
+    if (searchTerm) {
+        filteredCommands = filteredCommands.filter(command => 
+            command.command_name.toLowerCase().includes(searchTerm) ||
+            command.remote_name.toLowerCase().includes(searchTerm) ||
+            (command.device_type && command.device_type.toLowerCase().includes(searchTerm))
+        );
+    }
+    
+    if (selectedRemote) {
+        filteredCommands = filteredCommands.filter(command => 
+            command.file_id == selectedRemote
+        );
+    }
+    
+    renderCommands(filteredCommands);
+}
+
+async function editCommand(id) {
+    try {
+        const response = await fetch(`/api/command-templates/${id}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch command template');
+        }
+        
+        const command = await response.json();
+        
+        // Set the editing mode
+        currentEditingCommandId = id;
+        
+        // Update modal title
+        document.getElementById('modal-title').textContent = 'Edit Command';
+        
+        // Populate form fields
+        document.getElementById('modal-remote').value = command.file_id;
+        document.getElementById('modal-command').value = command.command_name;
+        document.getElementById('modal-device-type').value = command.device_type || '';
+        document.getElementById('modal-template-data').value = command.template_data || '';
+        
+        // Start with structured editor and populate from the database data
+        switchToStructuredEditor();
+        
+        // Populate structured editor from the loaded template data
+        if (command.template_data) {
+            updateStructuredFromJson();
+        }
+        
+        // Show modal
+        document.getElementById('command-modal').classList.remove('hidden');
+        
+    } catch (error) {
+        console.error('Error loading command for editing:', error);
+        alert('Error loading command for editing');
+    }
+}
+
+async function deleteCommand(id) {
+    if (confirm('Are you sure you want to delete this command?')) {
+        try {
+            const response = await fetch(`/api/command-templates/${id}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                loadCommands();
+            } else {
+                alert('Error deleting command');
+            }
+        } catch (error) {
+            console.error('Error deleting command:', error);
+            alert('Error deleting command');
+        }
+    }
+}
+
+function switchToStructuredEditor() {
+    currentEditorMode = 'structured';
+    document.getElementById('structured-editor').classList.remove('hidden');
+    document.getElementById('json-editor').classList.add('hidden');
+    document.getElementById('btn-structured-editor').classList.add('bg-blue-100', 'text-blue-800');
+    document.getElementById('btn-structured-editor').classList.remove('bg-gray-100', 'text-gray-800');
+    document.getElementById('btn-json-editor').classList.add('bg-gray-100', 'text-gray-800');
+    document.getElementById('btn-json-editor').classList.remove('bg-blue-100', 'text-blue-800');
+    
+    // Update structured fields from JSON
+    updateStructuredFromJson();
+}
+
+function switchToJsonEditor() {
+    currentEditorMode = 'json';
+    document.getElementById('structured-editor').classList.add('hidden');
+    document.getElementById('json-editor').classList.remove('hidden');
+    document.getElementById('btn-json-editor').classList.add('bg-blue-100', 'text-blue-800');
+    document.getElementById('btn-json-editor').classList.remove('bg-gray-100', 'text-gray-800');
+    document.getElementById('btn-structured-editor').classList.add('bg-gray-100', 'text-gray-800');
+    document.getElementById('btn-structured-editor').classList.remove('bg-blue-100', 'text-blue-800');
+    
+    // Update JSON from structured fields
+    updateJsonFromStructured();
+}
+
+function validateJson() {
+    const textarea = document.getElementById('modal-template-data');
+    const validation = document.getElementById('json-validation');
+    const errorMessage = document.getElementById('json-error-message');
+    
+    if (!textarea.value.trim()) {
+        validation.classList.add('hidden');
+        return true;
+    }
+    
+    try {
+        JSON.parse(textarea.value);
+        validation.classList.add('hidden');
+        return true;
+    } catch (e) {
+        if (errorMessage) {
+            errorMessage.textContent = e.message;
+        } else {
+            validation.textContent = `JSON Error: ${e.message}`;
+        }
+        validation.classList.remove('hidden');
+        return false;
+    }
+}
+
+function updateJsonFromStructured() {
+    if (currentEditorMode !== 'structured') return;
+    
+    // Check if there's existing JSON data to preserve its format
+    const existingJson = document.getElementById('modal-template-data').value;
+    let useDbFormat = false;
+    
+    if (existingJson.trim()) {
+        try {
+            const existingData = JSON.parse(existingJson);
+            // If it has database format fields, preserve that format
+            if (existingData.remote_id || existingData.command || existingData.signal_data) {
+                useDbFormat = true;
+            }
+        } catch (e) {
+            // If parsing fails, default to structured format
+        }
+    }
+    
+    if (useDbFormat) {
+        // Use database format
+        const modulationFreq = document.getElementById('modulation-freq').value;
+        const noRepeats = document.getElementById('no-repeats').value;
+        const intraSigPause = document.getElementById('intra-sig-pause').value;
+        const lengthsValue = document.getElementById('lengths').value;
+        
+        const templateData = {
+            remote_id: parseInt(document.getElementById('modal-remote').value) || 1,
+            command: document.getElementById('signal-name').value || '',
+            signal_data: document.getElementById('sig-data').value || '',
+            modulation_freq: modulationFreq || '36000',
+            no_repeats: noRepeats ? parseInt(noRepeats) : 1,
+            intra_sig_pause: intraSigPause ? parseFloat(intraSigPause) : 90.57,
+            lengths: lengthsValue ? 
+                     lengthsValue.split(',').map(l => {
+                         const num = parseFloat(l.trim());
+                         return isNaN(num) ? 0 : num;
+                     }).filter(l => l !== 0) : [],
+            double_signals: document.getElementById('double-signals').checked,
+            keyboard_signals: document.getElementById('keyboard-signals').checked,
+            xmp1_signals: document.getElementById('xmp1-signals').checked
+        };
+        
+        // Remove empty fields
+        Object.keys(templateData).forEach(key => {
+            if (templateData[key] === '' || (Array.isArray(templateData[key]) && templateData[key].length === 0)) {
+                delete templateData[key];
+            }
+        });
+        
+        document.getElementById('modal-template-data').value = JSON.stringify(templateData, null, 2);
+    } else {
+        // Use structured IRPacket format
+        const modulationFreq = document.getElementById('modulation-freq').value;
+        const noRepeats = document.getElementById('no-repeats').value;
+        const intraSigPause = document.getElementById('intra-sig-pause').value;
+        const lengthsValue = document.getElementById('lengths').value;
+        
+        const templateData = {
+            IRPacket: {
+                Name: document.getElementById('signal-name').value || '',
+                ModulationFreq: modulationFreq ? parseInt(modulationFreq) : 36000,
+                NoRepeats: noRepeats ? parseInt(noRepeats) : 1,
+                IntraSigPause: intraSigPause ? parseFloat(intraSigPause) : 90.57,
+                SigData: document.getElementById('sig-data').value || '',
+                Lengths: lengthsValue ? 
+                         lengthsValue.split(',').map(l => {
+                             const num = parseFloat(l.trim());
+                             return isNaN(num) ? 0 : num;
+                         }).filter(l => l !== 0) : [],
+                DoubleSignals: document.getElementById('double-signals').checked,
+                KeyboardSignals: document.getElementById('keyboard-signals').checked,
+                XMP1Signals: document.getElementById('xmp1-signals').checked
+            }
+        };
+        
+        // Remove empty fields
+        Object.keys(templateData.IRPacket).forEach(key => {
+            if (templateData.IRPacket[key] === '' || (Array.isArray(templateData.IRPacket[key]) && templateData.IRPacket[key].length === 0)) {
+                delete templateData.IRPacket[key];
+            }
+        });
+        
+        document.getElementById('modal-template-data').value = JSON.stringify(templateData, null, 2);
+    }
+}
+
+function updateStructuredFromJson() {
+    const jsonText = document.getElementById('modal-template-data').value;
+    if (!jsonText.trim()) return;
+    
+    try {
+        const data = JSON.parse(jsonText);
+        
+        // Handle both formats: our structured format and the database format
+        let signalData;
+        if (data.IRPacket) {
+            // Our structured format
+            signalData = data.IRPacket;
+        } else {
+            // Database format - use the data directly
+            signalData = data;
+        }
+        
+        // Map the database fields to our structured editor fields
+        document.getElementById('signal-name').value = signalData.Name || signalData.command || '';
+        document.getElementById('modulation-freq').value = signalData.ModulationFreq || signalData.modulation_freq || '';
+        document.getElementById('no-repeats').value = signalData.NoRepeats || signalData.no_repeats || '';
+        document.getElementById('intra-sig-pause').value = signalData.IntraSigPause || signalData.intra_sig_pause || '';
+        document.getElementById('sig-data').value = signalData.SigData || signalData.signal_data || '';
+        
+        // Handle lengths array
+        let lengths = signalData.Lengths || signalData.lengths || [];
+        document.getElementById('lengths').value = Array.isArray(lengths) ? lengths.join(', ') : '';
+        
+        // Handle boolean flags (default to false if not present)
+        document.getElementById('double-signals').checked = signalData.DoubleSignals === true || signalData.double_signals === true;
+        document.getElementById('keyboard-signals').checked = signalData.KeyboardSignals === true || signalData.keyboard_signals === true;
+        document.getElementById('xmp1-signals').checked = signalData.XMP1Signals === true || signalData.xmp1_signals === true;
+        
+    } catch (e) {
+        console.error('Error parsing JSON for structured editor:', e);
+        // If JSON parsing fails, try to extract data as plain text/other format
+        const jsonText = document.getElementById('modal-template-data').value;
+        console.log('Template data that failed to parse:', jsonText);
+    }
+}
+
+function clearTemplateFields() {
+    // Clear structured fields
+    document.getElementById('signal-name').value = '';
+    document.getElementById('modulation-freq').value = '';
+    document.getElementById('no-repeats').value = '';
+    document.getElementById('intra-sig-pause').value = '';
+    document.getElementById('sig-data').value = '';
+    document.getElementById('lengths').value = '';
+    document.getElementById('double-signals').checked = false;
+    document.getElementById('keyboard-signals').checked = false;
+    document.getElementById('xmp1-signals').checked = false;
+    
+    // Clear JSON
+    document.getElementById('modal-template-data').value = '';
+    document.getElementById('json-validation').classList.add('hidden');
+}
+
+function loadExampleTemplate() {
+    const exampleTemplate = {
+        remote_id: 1,
+        command: "power",
+        signal_data: "AAECAQIDAgECAQIEAgECAQIBAgMCAwIFAgMCAQIBAgECAQJ/AAECAQIDAgECAQIEAgECAQIBAgMCAwIFAgMCAQIBAgECAQJ/",
+        uid: "W9Ye/iw0s0u/kAQ8PW91Bg==",
+        modulation_freq: "36000",
+        no_repeats: 1,
+        intra_sig_pause: 90.57,
+        lengths: [0.4025, 0.297, 0.151, 0.631, 0.797, 0.464],
+        toggle_data: [{"bitNo": 19, "len1": 3, "len2": 1}, {"bitNo": 55, "len1": 3, "len2": 1}]
+    };
+    
+    document.getElementById('modal-template-data').value = JSON.stringify(exampleTemplate, null, 2);
+    
+    if (currentEditorMode === 'structured') {
+        updateStructuredFromJson();
+    }
+    
+    // Show a brief confirmation
+    const loadBtn = document.getElementById('btn-load-template');
+    const originalText = loadBtn.textContent;
+    loadBtn.textContent = 'Loaded!';
+    loadBtn.classList.remove('bg-green-100', 'text-green-800');
+    loadBtn.classList.add('bg-green-200', 'text-green-900');
+    
+    setTimeout(() => {
+        loadBtn.textContent = originalText;
+        loadBtn.classList.remove('bg-green-200', 'text-green-900');
+        loadBtn.classList.add('bg-green-100', 'text-green-800');
+    }, 1000);
+}
+
+// Client-side validation functions
+function validateLengthsInput() {
+    const lengthsInput = document.getElementById('lengths');
+    const value = lengthsInput.value.trim();
+    
+    if (!value) return true; // Empty is valid
+    
+    // Check if it's a valid comma-separated list of decimal numbers
+    const lengthsArray = value.split(',').map(l => l.trim());
+    const isValid = lengthsArray.every(length => {
+        if (length === '') return false; // Empty values not allowed
+        const num = parseFloat(length);
+        return !isNaN(num) && isFinite(num) && num >= 0;
+    });
+    
+    if (!isValid) {
+        lengthsInput.setCustomValidity('Please enter valid decimal numbers separated by commas (e.g., 0.4025, 0.297, 0.151)');
+    } else {
+        lengthsInput.setCustomValidity('');
+    }
+    
+    return isValid;
+}
+
+function validateNumericInput(inputId, fieldName, minVal = null, maxVal = null) {
+    const input = document.getElementById(inputId);
+    const value = input.value.trim();
+    
+    if (!value) {
+        input.setCustomValidity('');
+        return true; // Empty is valid for optional fields
+    }
+    
+    const num = parseFloat(value);
+    if (isNaN(num) || !isFinite(num)) {
+        input.setCustomValidity(`Please enter a valid number for ${fieldName}`);
+        return false;
+    }
+    
+    if (minVal !== null && num < minVal) {
+        input.setCustomValidity(`${fieldName} must be at least ${minVal}`);
+        return false;
+    }
+    
+    if (maxVal !== null && num > maxVal) {
+        input.setCustomValidity(`${fieldName} must be at most ${maxVal}`);
+        return false;
+    }
+    
+    input.setCustomValidity('');
+    return true;
+}
+</script>
+{% endblock %}

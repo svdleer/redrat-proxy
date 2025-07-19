@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+
+{% block title %}Command Sequences | RedRat Proxy{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <h1 class="text-3xl font-bold mb-6">Command Sequences</h1>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Sequence List -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">My Sequences</h2>
+                <button id="btn-new-sequence" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                    New Sequence
+                </button>
+            </div>
+            
+            <div id="sequence-list" class="space-y-2">
+                <!-- Sequences will be loaded here -->
+                <div class="animate-pulse">
+                    <div class="h-10 bg-slate-200 rounded"></div>
+                    <div class="h-10 bg-slate-200 rounded mt-2"></div>
+                    <div class="h-10 bg-slate-200 rounded mt-2"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sequence Editor -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div id="sequence-editor" class="hidden">
+                <h2 class="text-xl font-semibold mb-4">Edit Sequence</h2>
+                
+                <form id="form-sequence" class="space-y-4">
+                    <div>
+                        <label for="sequence-name" class="block text-sm font-medium text-gray-700">Name</label>
+                        <input type="text" id="sequence-name" name="name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    </div>
+                    
+                    <div>
+                        <label for="sequence-description" class="block text-sm font-medium text-gray-700">Description</label>
+                        <textarea id="sequence-description" name="description" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"></textarea>
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">Save</button>
+                    </div>
+                </form>
+                
+                <hr class="my-6">
+                
+                <h3 class="text-lg font-medium mb-4">Commands</h3>
+                
+                <div class="mb-4">
+                    <label for="select-command" class="block text-sm font-medium text-gray-700">Add Command</label>
+                    <div class="space-y-3 mt-1">
+                        <select id="select-command" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            <option value="">Select a command</option>
+                            <!-- Commands will be loaded here -->
+                        </select>
+                        
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label for="seq-ir-port" class="block text-xs font-medium text-gray-600">IR Port</label>
+                                <select id="seq-ir-port" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                                    <option value="1" selected>Port 1</option>
+                                    <option value="2">Port 2</option>
+                                    <option value="3">Port 3</option>
+                                    <option value="4">Port 4</option>
+                                    <option value="5">Port 5</option>
+                                    <option value="6">Port 6</option>
+                                    <option value="7">Port 7</option>
+                                    <option value="8">Port 8</option>
+                                    <option value="9">Port 9</option>
+                                    <option value="10">Port 10</option>
+                                    <option value="11">Port 11</option>
+                                    <option value="12">Port 12</option>
+                                    <option value="13">Port 13</option>
+                                    <option value="14">Port 14</option>
+                                    <option value="15">Port 15</option>
+                                    <option value="16">Port 16</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="seq-power" class="block text-xs font-medium text-gray-600">Power: <span id="seq-power-value">100%</span></label>
+                                <input type="range" id="seq-power" min="1" max="100" value="100" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider">
+                            </div>
+                        </div>
+                        
+                        <div class="flex">
+                            <input type="number" id="delay-ms" placeholder="Delay (ms)" min="0" step="100" value="0" class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                            <button id="btn-add-command" class="ml-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">Add</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="sequence-commands" class="space-y-2">
+                    <!-- Sequence commands will be loaded here -->
+                    <div class="text-gray-500 italic">No commands in this sequence</div>
+                </div>
+                
+                <div class="mt-6 flex justify-between">
+                    <button id="btn-execute-sequence" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded">Execute Sequence</button>
+                    <button id="btn-schedule-sequence" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded">Schedule</button>
+                </div>
+            </div>
+            
+            <div id="sequence-placeholder" class="text-center py-12 text-gray-500">
+                <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+                <p class="mt-2">Select or create a sequence to edit</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for scheduling -->
+<div id="schedule-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+        <h3 class="text-lg font-medium mb-4">Schedule Sequence</h3>
+        
+        <form id="form-schedule" class="space-y-4">
+            <div>
+                <label for="schedule-type" class="block text-sm font-medium text-gray-700">Schedule Type</label>
+                <select id="schedule-type" name="schedule_type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    <option value="once">One Time</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                </select>
+            </div>
+            
+            <div id="once-options">
+                <label for="schedule-datetime" class="block text-sm font-medium text-gray-700">Date & Time</label>
+                <input type="datetime-local" id="schedule-datetime" name="datetime" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+            </div>
+            
+            <div id="daily-options" class="hidden">
+                <label for="schedule-time-daily" class="block text-sm font-medium text-gray-700">Time</label>
+                <input type="time" id="schedule-time-daily" name="time" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+            </div>
+            
+            <div id="weekly-options" class="hidden">
+                <div>
+                    <label for="schedule-day" class="block text-sm font-medium text-gray-700">Day of Week</label>
+                    <select id="schedule-day" name="day" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                        <option value="0">Monday</option>
+                        <option value="1">Tuesday</option>
+                        <option value="2">Wednesday</option>
+                        <option value="3">Thursday</option>
+                        <option value="4">Friday</option>
+                        <option value="5">Saturday</option>
+                        <option value="6">Sunday</option>
+                    </select>
+                </div>
+                
+                <div class="mt-4">
+                    <label for="schedule-time-weekly" class="block text-sm font-medium text-gray-700">Time</label>
+                    <input type="time" id="schedule-time-weekly" name="time" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                </div>
+            </div>
+            
+            <div id="monthly-options" class="hidden">
+                <div>
+                    <label for="schedule-day-month" class="block text-sm font-medium text-gray-700">Day of Month</label>
+                    <select id="schedule-day-month" name="day" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                        {% for day in range(1, 29) %}
+                        <option value="{{ day }}">{{ day }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="mt-4">
+                    <label for="schedule-time-monthly" class="block text-sm font-medium text-gray-700">Time</label>
+                    <input type="time" id="schedule-time-monthly" name="time" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                </div>
+            </div>
+            
+            <div class="flex justify-end space-x-2">
+                <button type="button" id="btn-cancel-schedule" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded">Cancel</button>
+                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">Schedule</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/sequences.js') }}"></script>
+{% endblock %}
