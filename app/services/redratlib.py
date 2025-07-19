@@ -197,21 +197,6 @@ class IRNetBox():
             logger.error(error_msg)
             raise ValueError(error_msg)
             
-        # Additional validation for IR data format
-        if len(data) < 4:
-            error_msg = f"IR data too short: {len(data)} bytes (minimum 4 bytes required)"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-            
-        if len(data) > 1024:
-            error_msg = f"IR data too long: {len(data)} bytes (maximum 1024 bytes)"
-            logger.warning(error_msg)
-            # Don't raise exception, but warn - some signals might be legitimately long
-            
-        # Check for reasonable IR data format (should start with timing data)
-        if data[0] == 0x00 and data[1] == 0x00 and data[2] == 0x00:
-            logger.warning("IR data starts with multiple zeros - may indicate format issue")
-            
         logger.debug(f"IR data hex: {binascii.hexlify(data[:50]).decode()}..." if len(data) > 50 else f"IR data hex: {binascii.hexlify(data).decode()}")
         
         if self.irnetbox_model == NetBoxTypes.MK1:
@@ -219,11 +204,8 @@ class IRNetBox():
             logger.error(error_msg)
             raise Exception(error_msg)
             
-        else:
-            # IMPORTANT: Based on pcap analysis, ALL RedRat devices (including MK4/iRNetBox IV)
-            # work with the MK2 protocol using DOWNLOAD_SIGNAL + OUTPUT_IR_SIGNAL.
-            # The original MK4 async protocol (OUTPUT_IR_ASYNC) causes error 51.
-            logger.debug("Using MK2 protocol (works for all device types)")
+        elif self.irnetbox_model == NetBoxTypes.MK2:
+            logger.debug("Using MK2 protocol")
             self.reset()
             self.indicators_on()
             self._send(MessageTypes.SET_MEMORY)
@@ -253,12 +235,34 @@ class IRNetBox():
                     MessageTypes.CPLD_INSTRUCTION,
                     struct.pack("B", instruction2))
             
-            logger.debug("Downloading signal data using DOWNLOAD_SIGNAL (0x11)")
+            logger.debug("Downloading signal data")
             self._send(MessageTypes.DOWNLOAD_SIGNAL, data)
-            logger.debug("Outputting IR signal using OUTPUT_IR_SIGNAL (0x12)")
+            logger.debug("Outputting IR signal")
             self._send(MessageTypes.OUTPUT_IR_SIGNAL)
             self.reset()
             logger.info("MK2 IR signal sent successfully")
+        else:
+            # MK3, MK4, RRX protocol - Use SYNC mode like the working signal database
+            logger.debug(f"Using MK3/MK4/RRX protocol for device model: {self.irnetbox_model}")
+            
+            # For MK3+ devices, use SYNC mode with proper data format
+            # Based on working packet analysis: use message type 0x08 (OUTPUT_IR_SYNC)
+            ports = [0] * self.ports
+            ports[port - 1] = power
+            
+            logger.debug(f"Port configuration: {ports}")
+            
+            # Format the data payload for SYNC mode (matching working packets)
+            packet_format = "{0}s{1}s".format(self.ports, len(data))
+            logger.debug(f"Packet format: {packet_format}")
+            
+            payload = struct.pack(
+                packet_format,
+                struct.pack("{}B".format(self.ports), *ports),
+                data)
+            
+            self._send(MessageTypes.OUTPUT_IR_SYNC, payload)
+            logger.info("SYNC IR signal sent successfully")
 
     def _send(self, message_type, message_data=b""):
         logger.debug(f"Sending message: type={message_type:#04x}, data_length={len(message_data)}")
@@ -288,7 +292,14 @@ class IRNetBox():
                 logger.error(error_msg)
                 raise Exception(error_msg)
                 
-            if response_type == MessageTypes.OUTPUT_IR_ASYNC:
+            if response_type == MessageTypes.OUTPUT_IR_SYNC:
+                logger.debug("Processing sync IR response")
+                # For SYNC mode, the response should be immediate and simple
+                if len(response_data) > 0:
+                    logger.debug(f"SYNC response data: {binascii.hexlify(response_data).decode()}")
+                logger.debug("SYNC IR command completed successfully")
+                
+            elif response_type == MessageTypes.OUTPUT_IR_ASYNC:
                 logger.debug("Processing async IR response")
                 sequence_number, error_code, ack = struct.unpack(
                     # Sequence number in the ACK message is defined as big-endian
@@ -317,28 +328,6 @@ class IRNetBox():
                     logger.debug("Async IR operation completed successfully")
                 else:
                     error_msg = f"IRNetBox returned NACK (error code: {error_code})"
-                    
-                    # Add specific error code interpretations
-                    error_details = {
-                        51: "Invalid IR data format or corrupted signal data",
-                        52: "IR data too short or malformed",
-                        53: "IR data too long or exceeds device limits",
-                        54: "Invalid modulation frequency or timing parameters",
-                        55: "Device busy or in wrong state",
-                        56: "Port configuration error",
-                        57: "Power level out of range",
-                        58: "Sequence number mismatch",
-                        59: "Memory allocation failure",
-                        60: "Hardware communication error"
-                    }
-                    
-                    if error_code in error_details:
-                        error_msg += f" - {error_details[error_code]}"
-                        logger.error(f"RedRat error details: {error_details[error_code]}")
-                    else:
-                        error_msg += f" - Unknown error code"
-                        logger.error(f"Unknown RedRat error code: {error_code}")
-                    
                     logger.error(error_msg)
                     raise Exception(error_msg)
                     
@@ -391,6 +380,7 @@ class MessageTypes():
     POWER_ON = 0x05
     POWER_OFF = 0x06
     CPLD_INSTRUCTION = 0x07
+    OUTPUT_IR_SYNC = 0x08  # Added missing sync IR output message type
     DEVICE_VERSION = 0x09
     SET_MEMORY = 0x10
     DOWNLOAD_SIGNAL = 0x11
@@ -414,7 +404,7 @@ class NetBoxTypes():
             cls.MK1: "RedRat MK1",
             cls.MK2: "RedRat MK2", 
             cls.MK3: "RedRat MK3",
-            cls.MK4: "iRNetBox IV",
+            cls.MK4: "RedRat MK4",
             cls.RRX: "RedRat RRX"
         }
         return name_map.get(value, f"Unknown NetBox Type ({value})")
@@ -426,7 +416,7 @@ class NetBoxTypes():
             (cls.MK1, "RedRat MK1"),
             (cls.MK2, "RedRat MK2"),
             (cls.MK3, "RedRat MK3"),
-            (cls.MK4, "iRNetBox IV"),
+            (cls.MK4, "RedRat MK4"),
             (cls.RRX, "RedRat RRX")
         ]
 
