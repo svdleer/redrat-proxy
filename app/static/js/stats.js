@@ -263,22 +263,46 @@ function updateRedRatStatusIcon(devices) {
     if (!statusIndicator) {
         statusIndicator = document.createElement('div');
         statusIndicator.className = 'status-indicator';
-        statusIndicator.style.position = 'absolute';
-        statusIndicator.style.top = '4px';
-        statusIndicator.style.right = '4px';
+        statusIndicator.style.cssText = `
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+            display: block;
+        `;
         statusIcon.style.position = 'relative';
         statusIcon.appendChild(statusIndicator);
+        
+        // Ensure the parent container is visible
+        console.log('Status indicator added to:', statusIcon);
     }
     
-    // Update status indicator class based on overall status
+    // Force visibility and update status indicator color
+    statusIndicator.style.display = 'block';
+    
+    // Update status indicator color based on overall status
     if (statusCounts.online > 0 && statusCounts.offline === 0 && statusCounts.error === 0) {
+        statusIndicator.style.backgroundColor = '#10b981'; // green
         statusIndicator.className = 'status-indicator online';
+        // Add pulsing animation for online status
+        statusIndicator.style.animation = 'pulse 2s infinite';
     } else if (statusCounts.error > 0) {
+        statusIndicator.style.backgroundColor = '#ef4444'; // red
         statusIndicator.className = 'status-indicator error';
+        statusIndicator.style.animation = 'none';
     } else if (statusCounts.online > 0) {
+        statusIndicator.style.backgroundColor = '#f59e0b'; // yellow
         statusIndicator.className = 'status-indicator offline';
+        statusIndicator.style.animation = 'none';
     } else {
+        statusIndicator.style.backgroundColor = '#6b7280'; // gray
         statusIndicator.className = 'status-indicator unknown';
+        statusIndicator.style.animation = 'none';
     }
 }
 
