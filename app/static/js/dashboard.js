@@ -375,10 +375,23 @@ async function loadRedRatDevices() {
             } else {
                 devices.forEach(device => {
                     console.log('Device status:', device.last_status, 'for device:', device.name || device.ip_address);
-                    const status = device.last_status === 'online' ? '🟢' : '🔴';
+                    
+                    // Determine status icon with fallback logic
+                    let status = '🔴'; // Default to offline
+                    if (device.last_status === 'online') {
+                        status = '🟢';
+                    } else if (device.last_status === 'error') {
+                        status = '❌';
+                    } else if (device.last_status === 'offline' || !device.last_status) {
+                        status = '🔴';
+                    }
+                    
                     const ports = device.device_ports || 1;
                     const portDescriptions = device.port_descriptions ? JSON.stringify(device.port_descriptions) : '';
-                    redratSelect.innerHTML += `<option value="${device.id}" data-ports="${ports}" data-port-descriptions='${portDescriptions}'>${status} ${device.name || device.ip_address} (${device.ip_address}:${device.port}) - ${ports} ports</option>`;
+                    const deviceLabel = `${status} ${device.name || device.ip_address} (${device.ip_address}:${device.port}) - ${ports} ports`;
+                    console.log('Creating option with label:', deviceLabel);
+                    
+                    redratSelect.innerHTML += `<option value="${device.id}" data-ports="${ports}" data-port-descriptions='${portDescriptions}'>${deviceLabel}</option>`;
                 });
             }
         }

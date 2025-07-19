@@ -26,7 +26,12 @@ class RedRatDeviceService:
         for device in devices:
             device_dict = device.to_dict()
             
-            # If the device hasn't been checked recently, do a quick status check
+            # Ensure device has a status (default to offline if None)
+            if not device_dict.get('last_status'):
+                device_dict['last_status'] = 'offline'
+                logger.debug(f"Device {device.name} had no status, defaulting to 'offline'")
+            
+            # If the device hasn't been checked recently and is active, do a quick status check
             if device.is_active and (not device.last_status_check or 
                                    (datetime.now() - device.last_status_check).total_seconds() > 300):  # 5 minutes
                 try:
@@ -39,15 +44,18 @@ class RedRatDeviceService:
                                            connection_result.get('device_info', {}).get('model'),
                                            connection_result.get('device_info', {}).get('ports'))
                         device_dict['last_status'] = 'online'
+                        logger.debug(f"Status check: Device {device.name} is online")
                     else:
                         device.update_status('offline')
                         device_dict['last_status'] = 'offline'
+                        logger.debug(f"Status check: Device {device.name} is offline")
                         
                 except Exception as e:
                     logger.debug(f"Quick status check failed for {device.name}: {str(e)}")
                     device.update_status('error')
                     device_dict['last_status'] = 'error'
             
+            logger.debug(f"Device {device.name} final status: {device_dict['last_status']}")
             device_list.append(device_dict)
             
         return device_list
