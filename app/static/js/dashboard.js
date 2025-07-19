@@ -1,7 +1,13 @@
 // Common function to handle API calls with authentication
 async function apiCall(url, options = {}) {
     try {
-        const response = await fetch(url, options);
+        // Ensure credentials are included to send session cookies
+        const defaultOptions = {
+            credentials: 'same-origin',
+            ...options
+        };
+        
+        const response = await fetch(url, defaultOptions);
         
         if (response.status === 401) {
             // User is not authenticated, redirect to login
@@ -408,7 +414,12 @@ async function clearActivityLog() {
     }
     
     try {
-        const response = await apiCall('/api/activity', { method: 'DELETE' });
+        const response = await apiCall('/api/activity', { 
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
         if (response) {
             // Clear the activity feed display
             const activityFeed = document.getElementById('activity-feed');
@@ -432,7 +443,12 @@ async function clearRecentCommands() {
     }
     
     try {
-        const response = await apiCall('/api/history', { method: 'DELETE' });
+        const response = await apiCall('/api/history', { 
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
         if (response) {
             // Clear the recent commands display
             const recentCommands = document.getElementById('recent-commands');
