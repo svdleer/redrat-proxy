@@ -300,8 +300,9 @@ function updateRedRatStatusIcon(devices) {
         statusIndicator.className = 'status-indicator offline';
         statusIndicator.style.animation = 'none';
     } else {
-        statusIndicator.style.backgroundColor = '#6b7280'; // gray
-        statusIndicator.className = 'status-indicator unknown';
+        // All offline - use offline status, not unknown
+        statusIndicator.style.backgroundColor = '#f59e0b'; // yellow/orange for offline
+        statusIndicator.className = 'status-indicator offline';
         statusIndicator.style.animation = 'none';
     }
 }
