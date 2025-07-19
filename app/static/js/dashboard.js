@@ -363,7 +363,7 @@ async function loadRedRatDevices() {
     try {
         const response = await apiCall('/api/redrat/devices');
         
-        if (response && response.ok) {
+        if (response) {
             const data = await response.json();
             const devices = data.devices || [];
             
