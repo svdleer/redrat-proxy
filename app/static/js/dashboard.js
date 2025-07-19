@@ -365,6 +365,7 @@ async function loadRedRatDevices() {
         
         if (response) {
             const data = await response.json();
+            console.log('RedRat devices API response:', data);
             const devices = data.devices || [];
             
             redratSelect.innerHTML = '<option value="">Select a RedRat device...</option>';
@@ -373,6 +374,7 @@ async function loadRedRatDevices() {
                 redratSelect.innerHTML += '<option disabled>No RedRat devices available</option>';
             } else {
                 devices.forEach(device => {
+                    console.log('Device status:', device.last_status, 'for device:', device.name || device.ip_address);
                     const status = device.last_status === 'online' ? '🟢' : '🔴';
                     const ports = device.device_ports || 1;
                     const portDescriptions = device.port_descriptions ? JSON.stringify(device.port_descriptions) : '';
