@@ -257,6 +257,29 @@ function updateRedRatStatusIcon(devices) {
     // Update the icon with smooth transition
     statusIcon.className = bgClass;
     statusIconI.className = textClass;
+    
+    // Add status indicator circle if not already present
+    let statusIndicator = statusIcon.querySelector('.status-indicator');
+    if (!statusIndicator) {
+        statusIndicator = document.createElement('div');
+        statusIndicator.className = 'status-indicator';
+        statusIndicator.style.position = 'absolute';
+        statusIndicator.style.top = '4px';
+        statusIndicator.style.right = '4px';
+        statusIcon.style.position = 'relative';
+        statusIcon.appendChild(statusIndicator);
+    }
+    
+    // Update status indicator class based on overall status
+    if (statusCounts.online > 0 && statusCounts.offline === 0 && statusCounts.error === 0) {
+        statusIndicator.className = 'status-indicator online';
+    } else if (statusCounts.error > 0) {
+        statusIndicator.className = 'status-indicator error';
+    } else if (statusCounts.online > 0) {
+        statusIndicator.className = 'status-indicator offline';
+    } else {
+        statusIndicator.className = 'status-indicator unknown';
+    }
 }
 
 // Dashboard statistics and activity functions

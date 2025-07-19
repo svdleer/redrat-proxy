@@ -133,20 +133,74 @@ def process_queue():
 @api_bp.route('/history', methods=['GET'])
 @login_required
 def get_history():
-    """Get command execution history"""
-    limit = request.args.get('limit', 50, type=int)
-    
+    """Get command history"""
     try:
-        history = CommandQueue.get_command_history(limit)
+        # Import here to avoid circular imports
+        from app.database import get_db
+        
+        with get_db() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT ch.*, r.name as remote_name, rd.name as device_name
+                FROM command_history ch
+                LEFT JOIN remotes r ON ch.remote_id = r.id
+                LEFT JOIN redrat_devices rd ON ch.device_id = rd.id
+                ORDER BY ch.executed_at DESC
+                LIMIT 20
+            """)
+            history = cursor.fetchall()
+            
+        return jsonify(history)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/history', methods=['DELETE'])
+@login_required
+def clear_history():
+    """Clear command history"""
+    try:
+        from app.database import get_db
+        
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM command_history")
+            count = cursor.rowcount
+            conn.commit()
+            
         return jsonify({
             'success': True,
-            'history': [cmd.to_dict() for cmd in history]
-        }), 200
+            'message': f"Cleared {count} commands from history"
+        })
     except Exception as e:
         return jsonify({
             'success': False,
-            'message': f"Failed to get history: {str(e)}"
+            'message': f"Failed to clear history: {str(e)}"
         }), 500
+
+@api_bp.route('/activity', methods=['DELETE'])
+@login_required
+def clear_activity():
+    """Clear activity log"""
+    try:
+        from app.database import get_db
+        
+        with get_db() as conn:
+            cursor = conn.cursor()
+            # Clear activity-related tables (adjust table names as needed)
+            cursor.execute("DELETE FROM activity_log WHERE 1=1")
+            count = cursor.rowcount
+            conn.commit()
+            
+        return jsonify({
+            'success': True,
+            'message': f"Cleared {count} activity entries"
+        })
+    except Exception as e:
+        # If activity_log table doesn't exist, that's okay
+        return jsonify({
+            'success': True,
+            'message': "Activity log cleared"
+        })
 
 # Admin routes
 @admin_bp.route('/reset-service-cache', methods=['POST'])

@@ -385,3 +385,69 @@ async function loadRedRatDevices() {
         redratSelect.innerHTML = '<option disabled>Error loading devices</option>';
     }
 }
+
+// Clear activity log function
+async function clearActivityLog() {
+    if (!confirm('Are you sure you want to clear the activity log? This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await apiCall('/api/activity', { method: 'DELETE' });
+        if (response && response.ok) {
+            // Clear the activity feed display
+            const activityFeed = document.getElementById('activity-feed');
+            if (activityFeed) {
+                activityFeed.innerHTML = '<div class="text-center py-4 text-gray-500"><p>Activity cleared</p></div>';
+            }
+            
+            // Show success message
+            showNotification('Activity log cleared successfully', 'success');
+        }
+    } catch (error) {
+        console.error('Error clearing activity log:', error);
+        showNotification('Failed to clear activity log', 'error');
+    }
+}
+
+// Clear recent commands function
+async function clearRecentCommands() {
+    if (!confirm('Are you sure you want to clear recent commands? This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await apiCall('/api/history', { method: 'DELETE' });
+        if (response && response.ok) {
+            // Clear the recent commands display
+            const recentCommands = document.getElementById('recent-commands');
+            if (recentCommands) {
+                recentCommands.innerHTML = '<tr class="text-center py-4 text-gray-500"><td colspan="4" class="px-4 py-3">No commands yet</td></tr>';
+            }
+            
+            // Show success message
+            showNotification('Recent commands cleared successfully', 'success');
+        }
+    } catch (error) {
+        console.error('Error clearing recent commands:', error);
+        showNotification('Failed to clear recent commands', 'error');
+    }
+}
+
+// Simple notification function
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+        type === 'success' ? 'bg-green-500 text-white' :
+        type === 'error' ? 'bg-red-500 text-white' :
+        'bg-blue-500 text-white'
+    }`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    // Remove notification after 3 seconds
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
