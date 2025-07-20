@@ -224,7 +224,7 @@ class IRNetBox():
             raise Exception(error_msg)
             
         elif self.irnetbox_model == NetBoxTypes.MK2:
-            logger.debug("Using MK2 protocol for MK2 device")
+            logger.debug("Using MK2 protocol")
             # Original MK2 implementation from stb-tester
             self.reset()
             self.indicators_on()
@@ -250,38 +250,25 @@ class IRNetBox():
             self.reset()
             logger.info("MK2 IR signal sent successfully")
         else:
-            # MK3/MK4/RRX - Use native protocol for each device type
-            if self.irnetbox_model == NetBoxTypes.MK4:
-                logger.debug("Using native MK4 protocol")
-                logger.info("MK4 device detected - using native MK4 protocol")
-                
-                # MK4 uses direct IR transmission without async complications
-                ports = [0] * self.ports
-                ports[port - 1] = power
-                
-                self._send(
-                    MessageTypes.OUTPUT_IR_SIGNAL,  # Use synchronous IR output for MK4
-                    struct.pack("{}B".format(self.ports), *ports) + data)
-                logger.info("MK4 IR signal sent successfully")
-            else:
-                logger.debug(f"Using MK3 async protocol for model {self.irnetbox_model}")
-                
-                ports = [0] * self.ports
-                ports[port - 1] = power
-                sequence_number = random.randint(0, (2 ** 16) - 1)
-                delay = 0
-                
-                logger.debug(f"Sequence number: {sequence_number}, delay: {delay}")
-                logger.debug(f"Port configuration: {ports}")
-                
-                # MK3 protocol uses little-endian format consistently
-                port_data = struct.pack("{}B".format(self.ports), *ports)
-                
-                # Format: sequence(2) + delay(2) + port_config(16) + ir_data
-                message_data = struct.pack("<HH", sequence_number, delay) + port_data + data
-                
-                self._send(MessageTypes.OUTPUT_IR_ASYNC, message_data)
-                logger.info("Async IR signal sent successfully")
+            # MK3/MK4/RRX - Use async mode like the official tool
+            logger.debug(f"Using async protocol for model {self.irnetbox_model}")
+            ports = [0] * self.ports
+            ports[port - 1] = power
+            sequence_number = random.randint(0, (2 ** 16) - 1)
+            delay = 0  # use the default delay of 100ms
+            
+            logger.debug(f"Sequence number: {sequence_number}, delay: {delay}")
+            logger.debug(f"Port configuration: {ports}")
+            
+            self._send(
+                MessageTypes.OUTPUT_IR_ASYNC,
+                struct.pack(
+                    ">HH{0}s{1}s".format(self.ports, len(data)),
+                    sequence_number,
+                    delay,
+                    struct.pack("{}B".format(self.ports), *ports),
+                    data))
+            logger.info("Async IR signal sent successfully")
 
     def _send(self, message_type, message_data=b""):
         logger.debug(f"Sending message: type={message_type:#04x}, data_length={len(message_data)}")
@@ -323,39 +310,22 @@ class IRNetBox():
                 
                 if ack == 1:
                     logger.debug("Received ACK, waiting for completion message")
-                    try:
-                        # Set a shorter timeout for the completion message
-                        original_timeout = self._socket.gettimeout()
-                        self._socket.settimeout(2.0)  # 2 second timeout for completion
+                    async_type, async_data = next(self._responses)
+                    logger.debug(f"Async completion: type={async_type:#04x}, data_length={len(async_data)}")
+                    
+                    if async_type != MessageTypes.IR_ASYNC_COMPLETE:
+                        error_msg = f"IRNetBox returned unexpected message {async_type:#04x}"
+                        logger.error(error_msg)
+                        raise Exception(error_msg)
                         
-                        async_type, async_data = next(self._responses)
-                        logger.debug(f"Async completion: type={async_type:#04x}, data_length={len(async_data)}")
-                        
-                        # Restore original timeout
-                        self._socket.settimeout(original_timeout)
-                        
-                        if async_type != MessageTypes.IR_ASYNC_COMPLETE:
-                            error_msg = f"IRNetBox returned unexpected message {async_type:#04x}"
-                            logger.error(error_msg)
-                            raise Exception(error_msg)
-                            
-                        (async_sequence_number,) = struct.unpack(">H", async_data[:2])
-                        logger.debug(f"Async completion sequence number: {async_sequence_number}")
-                        
-                        if async_sequence_number != sequence_number:
-                            error_msg = f"IRNetBox returned message IR_ASYNC_COMPLETE with unexpected sequence number {async_sequence_number} (expected {sequence_number})"
-                            logger.error(error_msg)
-                            raise Exception(error_msg)
-                        logger.debug("Async IR operation completed successfully")
-                        
-                    except (StopIteration, OSError) as e:
-                        # Handle timeout or connection issues during completion wait
-                        logger.warning(f"Completion message timeout or connection issue: {e}")
-                        logger.info("IR signal may have been sent despite completion timeout")
-                        # Restore timeout and continue - some devices don't send completion
-                        if hasattr(self._socket, 'settimeout'):
-                            self._socket.settimeout(original_timeout)
-                        
+                    (async_sequence_number,) = struct.unpack(">H", async_data[:2])
+                    logger.debug(f"Async completion sequence number: {async_sequence_number}")
+                    
+                    if async_sequence_number != sequence_number:
+                        error_msg = f"IRNetBox returned message IR_ASYNC_COMPLETE with unexpected sequence number {async_sequence_number} (expected {sequence_number})"
+                        logger.error(error_msg)
+                        raise Exception(error_msg)
+                    logger.debug("Async IR operation completed successfully")
                 else:
                     error_msg = f"IRNetBox returned NACK (error code: {error_code})"
                     logger.error(error_msg)
