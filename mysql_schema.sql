@@ -5,19 +5,6 @@
 CREATE DATABASE IF NOT EXISTS redrat_proxy;
 USE redrat_proxy;
 
--- Drop existing tables if they exist (in correct order due to foreign keys)
-DROP TABLE IF EXISTS api_keys;
-DROP TABLE IF EXISTS schedules;
-DROP TABLE IF EXISTS command_templates;
-DROP TABLE IF EXISTS sequence_commands;
-DROP TABLE IF EXISTS sequences;
-DROP TABLE IF EXISTS commands;
-DROP TABLE IF EXISTS remote_files;
-DROP TABLE IF EXISTS sessions;
-DROP TABLE IF EXISTS redrat_devices;
-DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS remotes;
-
 -- Remotes table - stores remote control definitions
 CREATE TABLE remotes (
     id INT AUTO_INCREMENT PRIMARY KEY,
