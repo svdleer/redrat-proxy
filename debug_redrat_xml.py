@@ -5,9 +5,17 @@ Parse proper RedRat Signal DB XML format and compare with database
 """
 
 import sys
+import os
 import xml.etree.ElementTree as ET
 import mysql.connector
 from mysql.connector import Error
+from dotenv import load_dotenv
+import subprocess
+import time
+import socket
+
+# Load environment variables from .env file
+load_dotenv()
 
 def extract_commands_from_redrat_xml(xml_file):
     """Extract command names from RedRat Signal DB XML file."""
@@ -41,22 +49,92 @@ def extract_commands_from_redrat_xml(xml_file):
         print(f"Error reading XML file: {e}")
         return []
 
+def create_ssh_tunnel():
+    """Create SSH tunnel to access remote MySQL database."""
+    ssh_host = "access-engineering.nl"
+    ssh_port = 65001
+    ssh_user = "svdleer"
+    local_port = 3307  # Use different port to avoid conflicts
+    remote_host = "localhost"  # MySQL on remote server
+    remote_port = 3306
+    
+    # Check if tunnel already exists
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        result = sock.connect_ex(('127.0.0.1', local_port))
+        sock.close()
+        if result == 0:
+            print(f"SSH tunnel already exists on port {local_port}")
+            return local_port
+    except:
+        pass
+    
+    # Create SSH tunnel
+    ssh_command = [
+        "ssh", "-N", "-L", 
+        f"{local_port}:{remote_host}:{remote_port}",
+        f"{ssh_user}@{ssh_host}",
+        "-p", str(ssh_port)
+    ]
+    
+    print(f"Creating SSH tunnel: {' '.join(ssh_command)}")
+    
+    try:
+        # Start SSH tunnel in background
+        process = subprocess.Popen(ssh_command, 
+                                 stdout=subprocess.PIPE, 
+                                 stderr=subprocess.PIPE)
+        
+        # Wait a moment for tunnel to establish
+        time.sleep(2)
+        
+        # Check if tunnel is working
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        result = sock.connect_ex(('127.0.0.1', local_port))
+        sock.close()
+        
+        if result == 0:
+            print(f"SSH tunnel established successfully on port {local_port}")
+            return local_port
+        else:
+            print("Failed to establish SSH tunnel")
+            return None
+            
+    except Exception as e:
+        print(f"Error creating SSH tunnel: {e}")
+        return None
+
 def get_database_commands():
     """Get IR commands from the database."""
     try:
-        # Database connection parameters
+        # Create SSH tunnel first
+        local_port = create_ssh_tunnel()
+        if not local_port:
+            print("Failed to create SSH tunnel, cannot connect to database")
+            return []
+        
+        # Database connection parameters via SSH tunnel
         config = {
-            'host': 'localhost',
-            'database': 'redrat_db',
-            'user': 'redrat_user',
-            'password': 'redrat_password'
+            'host': '127.0.0.1',  # Connect via SSH tunnel
+            'port': local_port,
+            'database': os.getenv('MYSQL_DB', 'redrat_proxy'),
+            'user': os.getenv('MYSQL_USER', 'redrat'),
+            'password': os.getenv('MYSQL_PASSWORD', 'password')
         }
+        
+        print(f"Connecting to MySQL via SSH tunnel: {config['user']}@{config['host']}:{config['port']}/{config['database']}")
         
         connection = mysql.connector.connect(**config)
         cursor = connection.cursor()
         
-        # Get all IR commands
-        cursor.execute("SELECT command, device FROM ir_commands ORDER BY device, command")
+        # Get all IR commands from command_templates table
+        cursor.execute("""
+            SELECT ct.name, r.name as device_name 
+            FROM command_templates ct 
+            JOIN remote_files rf ON ct.file_id = rf.id 
+            LEFT JOIN remotes r ON rf.name = r.name
+            ORDER BY r.name, ct.name
+        """)
         
         commands = []
         for (command, device) in cursor:

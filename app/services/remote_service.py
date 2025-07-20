@@ -159,17 +159,16 @@ def parse_remotes_xml(xml_path):
             
             if signal_type == 'DoubleSignal':
                 # Handle DoubleSignal type (contains Signal1 and Signal2)
+                # A DoubleSignal should be treated as ONE command, not split into separate entries
                 name = signal.find('Name')
                 if name is not None and name.text:
-                    # Process Signal1
+                    # Use Signal1 as the primary signal (as per RedRat documentation)
                     signal1 = signal.find('Signal1')
                     if signal1 is not None:
-                        process_single_signal(signal1, f"{name.text}_Signal1", signals, remote_name)
-                    
-                    # Process Signal2
-                    signal2 = signal.find('Signal2')
-                    if signal2 is not None:
-                        process_single_signal(signal2, f"{name.text}_Signal2", signals, remote_name)
+                        # Process as a single command with the original name (no _Signal1 suffix)
+                        process_single_signal(signal1, name.text, signals, remote_name)
+                    else:
+                        print(f"Warning: DoubleSignal '{name.text}' has no Signal1")
                 else:
                     print("Skipped DoubleSignal: no name")
             else:
