@@ -1168,7 +1168,7 @@ def get_sequence(user, sequence_id):
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT s.id, s.name, s.description
-                FROM sequences s
+                FROM sequences s 
                 WHERE s.id = %s AND s.created_by = %s
             """, (sequence_id, user['id']))
             
@@ -1197,7 +1197,7 @@ def get_sequence(user, sequence_id):
                     'delay_ms': row[5],
                     'remote_name': row[6],
                     'ir_port': row[7] if row[7] is not None else 1,
-                    'power': row[8] if row[8] is not None else 100
+                    'power': row[8] if row[8] is not None else 50
                 })
             
             return jsonify({
@@ -1638,7 +1638,7 @@ def execute_sequence(user, sequence_id):
                     'delay_ms': row[5],
                     'remote_name': row[6],
                     'ir_port': row[7] if row[7] is not None else 1,
-                    'power': row[8] if row[8] is not None else 100
+                    'power': row[8] if row[8] is not None else 50
                 })
         
         if not commands:

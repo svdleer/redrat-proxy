@@ -177,10 +177,10 @@ CREATE TABLE api_keys (
 
 -- Insert default admin user
 -- Username: admin
--- Password: admin123
+-- Password: admin
 -- Password hash generated using bcrypt with 12 rounds
 INSERT INTO users (username, password_hash, is_admin) VALUES 
-('admin', '$2b$12$8NwSjJj4cdXkS76kNakZy.y0Fih5.jB/0KjBh94AVsCxpgIMnX9/S', TRUE);
+('admin', '$2b$12$lVwTWPNZg1iPpKtcjWFHPujK3Cvi6rwWG1kw7p.DHkGg4P9WlKNa2', TRUE);
 
 -- Create indexes for better performance
 CREATE INDEX idx_commands_status ON commands(status);
