@@ -700,7 +700,7 @@ def handle_commands(user):
                 INSERT INTO commands (remote_id, command, device, status, created_by, ir_port, power)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, (data['remote_id'], data['command'], f"RedRat Device {data['redrat_device_id']}", 'pending', user['id'], 
-                  data.get('ir_port', 1), data.get('power', 100)))
+                  data.get('ir_port', 1), data.get('power', 50)))
             conn.commit()
             
             command_id = cursor.lastrowid
@@ -715,7 +715,7 @@ def handle_commands(user):
                     'device': f"RedRat Device {data['redrat_device_id']}",
                     'redrat_device_id': data['redrat_device_id'],
                     'ir_port': data.get('ir_port', 1),
-                    'power': data.get('power', 100)
+                    'power': data.get('power', 50)
                 }
                 
                 if add_command(command_data):
@@ -1542,7 +1542,7 @@ def add_command_to_sequence(user, sequence_id):
         command_id = data.get('command_id')  # This is actually a command template ID
         delay_ms = data.get('delay_ms', 0)
         ir_port = data.get('ir_port', 1)  # Default to port 1
-        power = data.get('power', 100)  # Default to full power
+        power = data.get('power', 50)  # Default to half power
         
         # First, get the command template to extract command info
         with db.get_connection() as conn:
@@ -1833,7 +1833,7 @@ def execute_command(user, command_id):
         # Get execution parameters from request
         data = request.get_json() or {}
         ir_port = data.get('ir_port', 1)
-        power = data.get('power', 100)
+        power = data.get('power', 50)
         
         # Add command to execution queue
         try:
@@ -1885,7 +1885,7 @@ def execute_remote_command(user, remote_id, command_name):
         # Get execution parameters from request
         data = request.get_json() or {}
         ir_port = data.get('ir_port', 1)
-        power = data.get('power', 100)
+        power = data.get('power', 50)
         device = data.get('device', remote['name'])
         
         # Create temporary command for execution

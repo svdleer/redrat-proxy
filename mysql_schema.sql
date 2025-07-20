@@ -1,7 +1,25 @@
+-- RedRat Proxy Database Schema
+-- Clean schema with only admin user data
+-- Database: redrat_proxy
+
 CREATE DATABASE IF NOT EXISTS redrat_proxy;
 USE redrat_proxy;
 
-CREATE TABLE IF NOT EXISTS remotes (
+-- Drop existing tables if they exist (in correct order due to foreign keys)
+DROP TABLE IF EXISTS api_keys;
+DROP TABLE IF EXISTS schedules;
+DROP TABLE IF EXISTS command_templates;
+DROP TABLE IF EXISTS sequence_commands;
+DROP TABLE IF EXISTS sequences;
+DROP TABLE IF EXISTS commands;
+DROP TABLE IF EXISTS remote_files;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS redrat_devices;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS remotes;
+
+-- Remotes table - stores remote control definitions
+CREATE TABLE remotes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     manufacturer VARCHAR(255),
@@ -15,7 +33,8 @@ CREATE TABLE IF NOT EXISTS remotes (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS users (
+-- Users table - application users
+CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -23,14 +42,16 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS sessions (
+-- Sessions table - user authentication sessions
+CREATE TABLE sessions (
     session_id VARCHAR(255) PRIMARY KEY,
     user_id INT NOT NULL,
     expires_at TIMESTAMP NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS remote_files (
+-- Remote files table - uploaded remote control files
+CREATE TABLE remote_files (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     filename VARCHAR(255) NOT NULL,
@@ -41,13 +62,14 @@ CREATE TABLE IF NOT EXISTS remote_files (
     FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS commands (
+-- Commands table - individual IR commands
+CREATE TABLE commands (
     id INT AUTO_INCREMENT PRIMARY KEY,
     remote_id INT NOT NULL,
     command VARCHAR(255) NOT NULL,
     device VARCHAR(255),
     ir_port INT DEFAULT 1,
-    power INT DEFAULT 100,
+    power INT DEFAULT 50,
     status ENUM('pending', 'executed', 'failed') NOT NULL DEFAULT 'pending',
     created_by INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -57,23 +79,31 @@ CREATE TABLE IF NOT EXISTS commands (
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS sequences (
+-- Sequences table - command sequences/macros
+CREATE TABLE sequences (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    description TEXT,
+    commands JSON NOT NULL,
+    device VARCHAR(255),
+    ir_port INT DEFAULT 1,
+    power INT DEFAULT 50,
+    status ENUM('pending', 'executing', 'completed', 'failed') NOT NULL DEFAULT 'pending',
     created_by INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    executed_at TIMESTAMP NULL,
+    status_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS sequence_commands (
+-- Sequence commands table - individual commands within sequences
+CREATE TABLE sequence_commands (
     id INT AUTO_INCREMENT PRIMARY KEY,
     sequence_id INT NOT NULL,
     command VARCHAR(255) NOT NULL,
     device VARCHAR(255),
     remote_id INT NOT NULL,
     ir_port INT DEFAULT 1,
-    power INT DEFAULT 100,
+    power INT DEFAULT 50,
     position INT NOT NULL,
     delay_ms INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -81,7 +111,8 @@ CREATE TABLE IF NOT EXISTS sequence_commands (
     FOREIGN KEY (remote_id) REFERENCES remotes(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS schedules (
+-- Schedules table - scheduled commands and sequences
+CREATE TABLE schedules (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     type ENUM('command', 'sequence') NOT NULL,
@@ -96,7 +127,8 @@ CREATE TABLE IF NOT EXISTS schedules (
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS command_templates (
+-- Command templates table - parsed command templates from remote files
+CREATE TABLE command_templates (
     id INT AUTO_INCREMENT PRIMARY KEY,
     file_id INT NOT NULL,
     name VARCHAR(255) NOT NULL,
@@ -108,8 +140,8 @@ CREATE TABLE IF NOT EXISTS command_templates (
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- RedRat devices table
-CREATE TABLE IF NOT EXISTS redrat_devices (
+-- RedRat devices table - physical RedRat IR devices
+CREATE TABLE redrat_devices (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     ip_address VARCHAR(45) NOT NULL,
@@ -128,8 +160,8 @@ CREATE TABLE IF NOT EXISTS redrat_devices (
     UNIQUE KEY unique_device (ip_address, port)
 );
 
--- API keys table
-CREATE TABLE IF NOT EXISTS api_keys (
+-- API keys table - API authentication keys
+CREATE TABLE api_keys (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     key_hash VARCHAR(64) NOT NULL,
@@ -143,7 +175,23 @@ CREATE TABLE IF NOT EXISTS api_keys (
     INDEX idx_key_hash (key_hash)
 );
 
--- Default admin user (password: admin)
--- This hash is generated using bcrypt with 12 rounds
-INSERT INTO users (username, password_hash, is_admin)
-VALUES ('admin', '$2b$12$8NwSjJj4cdXkS76kNakZy.y0Fih5.jB/0KjBh94AVsCxpgIMnX9/S', TRUE);
+-- Insert default admin user
+-- Username: admin
+-- Password: admin123
+-- Password hash generated using bcrypt with 12 rounds
+INSERT INTO users (username, password_hash, is_admin) VALUES 
+('admin', '$2b$12$8NwSjJj4cdXkS76kNakZy.y0Fih5.jB/0KjBh94AVsCxpgIMnX9/S', TRUE);
+
+-- Create indexes for better performance
+CREATE INDEX idx_commands_status ON commands(status);
+CREATE INDEX idx_commands_created_at ON commands(created_at);
+CREATE INDEX idx_sequences_status ON sequences(status);
+CREATE INDEX idx_remotes_name ON remotes(name);
+CREATE INDEX idx_remote_files_uploaded_by ON remote_files(uploaded_by);
+CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
+CREATE INDEX idx_redrat_devices_status ON redrat_devices(last_status);
+CREATE INDEX idx_schedules_next_run ON schedules(next_run);
+CREATE INDEX idx_schedules_status ON schedules(status);
+
+-- Set default charset and collation
+ALTER DATABASE redrat_proxy CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

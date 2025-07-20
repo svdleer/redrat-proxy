@@ -176,7 +176,7 @@ class CommandQueue:
                 command['remote_id'],
                 command['command'],
                 command.get('ir_port', 1),
-                command.get('power', 100)
+                command.get('power', 50)
             )
             
             if result['success']:

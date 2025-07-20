@@ -58,7 +58,7 @@ class RedRatService:
         self._lock = threading.Lock()
         
     def send_command(self, command_id: int, remote_id: int, command_name: str, 
-                    ir_port: int = 1, power: int = 100) -> Dict[str, Any]:
+                    ir_port: int = 1, power: int = 50) -> Dict[str, Any]:
         """Send a command to the RedRat device.
         
         Args:
@@ -157,7 +157,7 @@ class RedRatService:
                         cmd.get('remote_id'),
                         cmd.get('command'),
                         cmd.get('ir_port', 1),
-                        cmd.get('power', 100)
+                        cmd.get('power', 50)
                     )
                     
                     if cmd_result['success']:
