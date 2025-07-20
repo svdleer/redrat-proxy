@@ -57,6 +57,48 @@ class RedRatService:
         self.timeout = timeout
         self._lock = threading.Lock()
         
+    def validate_device_and_port(self, ir_port: int = 1) -> Dict[str, Any]:
+        """Validate that the RedRat device is accessible and the IR port is valid.
+        
+        Args:
+            ir_port: IR output port to validate (1-16)
+            
+        Returns:
+            Dict with validation results
+        """
+        result = {
+            'success': False,
+            'device_accessible': False,
+            'port_valid': False,
+            'error': None
+        }
+        
+        try:
+            # Validate port number range
+            if not (1 <= ir_port <= 16):
+                result['error'] = f"Invalid IR port {ir_port}. Must be between 1 and 16"
+                return result
+            
+            result['port_valid'] = True
+            
+            # Test device connectivity
+            logger.debug(f"Testing connectivity to RedRat device at {self.host}:{self.port}")
+            
+            with self._lock:
+                with IRNetBox(self.host, self.port) as ir:
+                    # Power on device to ensure it's ready
+                    ir.power_on()
+                    result['device_accessible'] = True
+                    logger.debug(f"RedRat device accessible, IR port {ir_port} ready")
+            
+            result['success'] = True
+            
+        except Exception as e:
+            result['error'] = f"Device validation failed: {str(e)}"
+            logger.error(f"RedRat device validation error: {str(e)}")
+            
+        return result
+        
     def send_command(self, command_id: int, remote_id: int, command_name: str, 
                     ir_port: int = 1, power: int = 50) -> Dict[str, Any]:
         """Send a command to the RedRat device.
@@ -80,6 +122,16 @@ class RedRatService:
         }
         
         try:
+            # Validate device connectivity and port before executing command
+            logger.debug(f"Validating RedRat device and IR port {ir_port}")
+            validation_result = self.validate_device_and_port(ir_port)
+            if not validation_result['success']:
+                result['message'] = validation_result['error']
+                result['error_details'] = f"Device validation failed for port {ir_port}"
+                return result
+            
+            logger.debug(f"Device validation successful, proceeding with command execution")
+            
             # Get command template data from database
             template_data = self._get_command_template(remote_id, command_name)
             if not template_data:
@@ -498,8 +550,22 @@ class RedRatService:
             
             with self._lock:  # Ensure thread safety
                 with IRNetBox(self.host, self.port) as ir:
+                    # Ensure device is powered on and ready
+                    logger.debug(f"Powering on RedRat device and preparing port {ir_port}")
                     ir.power_on()
+                    
+                    # Turn on indicators for visual feedback
                     ir.indicators_on()
+                    
+                    # Small delay to ensure device is ready
+                    time.sleep(0.1)
+                    
+                    # Validate port number is within reasonable range
+                    if not (1 <= ir_port <= 16):
+                        result['error'] = f"Invalid IR port {ir_port}. Must be between 1 and 16"
+                        return result
+                    
+                    logger.debug(f"Device ready, sending IR signal to port {ir_port}")
                     
                     # Send the IR signal with specified number of repeats
                     for repeat in range(no_repeats):
@@ -510,8 +576,10 @@ class RedRatService:
                         
                         ir.irsend_raw(ir_port, power, ir_data)
                     
+                    logger.debug(f"IR command completed successfully on port {ir_port}")
                     result['success'] = True
                     result['repeats_sent'] = no_repeats
+                    result['port_used'] = ir_port
                     
         except Exception as e:
             result['error'] = str(e)

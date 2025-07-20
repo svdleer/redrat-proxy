@@ -2544,6 +2544,96 @@ def reset_redrat_device(user, device_id):
         logger.error(f"Error resetting RedRat device {device_id}: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/redrat/devices/<int:device_id>/validate-port', methods=['POST'])
+@login_required()
+def validate_redrat_device_port(user, device_id):
+    """
+    Validate RedRat device connectivity and IR port readiness
+    ---
+    tags:
+      - RedRat Devices
+    parameters:
+      - in: path
+        name: device_id
+        type: integer
+        required: true
+        description: RedRat device ID
+      - in: body
+        name: port_data
+        schema:
+          type: object
+          properties:
+            ir_port:
+              type: integer
+              minimum: 1
+              maximum: 16
+              default: 1
+              description: IR port to validate (1-16)
+    responses:
+      200:
+        description: Port validation results
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+            device_accessible:
+              type: boolean
+            port_valid:
+              type: boolean
+            device_id:
+              type: integer
+            ir_port:
+              type: integer
+            message:
+              type: string
+      404:
+        description: Device not found
+      500:
+        description: Server error
+    """
+    try:
+        data = request.get_json() or {}
+        ir_port = data.get('ir_port', 1)
+        
+        # Get device details from database
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT ip_address, port FROM redrat_devices 
+                WHERE id = %s AND is_active = 1
+            """, (device_id,))
+            device = cursor.fetchone()
+            
+            if not device:
+                return jsonify({'success': False, 'error': 'RedRat device not found or inactive'}), 404
+            
+            device_ip, device_port = device
+        
+        # Create RedRat service instance and validate port
+        from app.services.redrat_service import RedRatService
+        redrat_service = RedRatService(device_ip, device_port)
+        
+        logger.info(f"Validating RedRat device {device_id} ({device_ip}:{device_port}) port {ir_port}")
+        validation_result = redrat_service.validate_device_and_port(ir_port)
+        
+        # Add device info to result
+        validation_result['device_id'] = device_id
+        validation_result['ir_port'] = ir_port
+        validation_result['device_address'] = f"{device_ip}:{device_port}"
+        
+        if validation_result['success']:
+            validation_result['message'] = f"Device {device_id} port {ir_port} is ready"
+            logger.info(f"RedRat device {device_id} port {ir_port} validation successful")
+        else:
+            logger.warning(f"RedRat device {device_id} port {ir_port} validation failed: {validation_result['error']}")
+        
+        return jsonify(validation_result)
+        
+    except Exception as e:
+        logger.error(f"Error validating RedRat device {device_id} port: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # API Key Management Endpoints
 @app.route('/api/keys', methods=['GET'])
 @login_required(admin_only=True)

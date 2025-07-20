@@ -169,6 +169,12 @@ CREATE TABLE api_keys (
 INSERT INTO users (username, password_hash, is_admin) VALUES 
 ('admin', '$2b$12$lVwTWPNZg1iPpKtcjWFHPujK3Cvi6rwWG1kw7p.DHkGg4P9WlKNa2', TRUE);
 
+-- Insert default API key
+-- API Key: rr_X_Tk5fZC3h8_oUln1IZeGQT07-5QxqJrKLeLdy5uTwE
+-- Hash generated using SHA-256
+INSERT INTO api_keys (name, key_hash, user_id, is_active) VALUES 
+('Default API Key', '2e8822c3b2c57a177ed65a47f22c7a67e5e7b4ce104db2aea5578e74bb54a9f7', 1, TRUE);
+
 -- Create indexes for better performance
 CREATE INDEX idx_commands_status ON commands(status);
 CREATE INDEX idx_commands_created_at ON commands(created_at);
