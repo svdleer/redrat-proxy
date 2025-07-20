@@ -21,19 +21,13 @@ services:
       - ./data/uploads:/app/app/static/uploads:rw
       - ./data/remote_images:/app/app/static/remote_images:rw
       
-    # Mount logs directory for production logging (read-write)
-    - ./logs:/app/logs:rw
-  
-  # Expose port for reverse proxy access
-  ports:
-    - "5000:5000"
-  
-  # Remove host networking - use bridge networking for isolation
-  # network_mode: host  # Commented out for reverse proxy setup
-  
-  # Add host resolution for host.docker.internal
-  extra_hosts:
-    - "host.docker.internal:host-gateway"    # Production environment configuration (most values come from .env file)
+      # Mount logs directory for production logging (read-write)
+      - ./logs:/app/logs:rw
+    
+    # Using host networking for direct access to host services
+    network_mode: host
+    
+    # Production environment configuration (most values come from .env file)
     environment:
       # Database connection (from .env file)
       - MYSQL_HOST=${MYSQL_HOST:-localhost}
