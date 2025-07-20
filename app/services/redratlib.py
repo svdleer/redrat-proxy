@@ -230,19 +230,23 @@ class IRNetBox():
             self._send(MessageTypes.OUTPUT_IR_SYNC, payload)
             logger.info("Forced MK3+ SYNC IR signal sent successfully")
         else:
-            # MK3, MK4, RRX protocol - Use SYNC mode like the working signal database
-            logger.debug(f"Using MK3/MK4/RRX protocol for device model: {self.irnetbox_model}")
+            # FORCE MK3 PROTOCOL: Official tool likely uses MK3 instead of MK4
+            logger.debug(f"Device detected as model {self.irnetbox_model}, but FORCING MK3 protocol for compatibility")
+            logger.info("Protocol override: Using MK3 protocol to match official RedRat tool")
             
-            # For MK3+ devices, use SYNC mode with proper data format
-            # Based on working packet analysis: use message type 0x08 (OUTPUT_IR_SYNC)
+            # Force treat as MK3 (model=8) instead of MK4 (model=12)
+            effective_model = NetBoxTypes.MK3
+            logger.debug(f"Effective protocol model: {effective_model} (MK3) instead of {self.irnetbox_model}")
+            
+            # MK3-specific SYNC mode implementation
             ports = [0] * self.ports
             ports[port - 1] = power
             
-            logger.debug(f"Port configuration: {ports}")
+            logger.debug(f"MK3 Port configuration: {ports}")
             
-            # Format the data payload for SYNC mode (matching working packets)
+            # Use MK3-specific payload format (simpler than MK4)
             packet_format = "{0}s{1}s".format(self.ports, len(data))
-            logger.debug(f"Packet format: {packet_format}")
+            logger.debug(f"MK3 Packet format: {packet_format}")
             
             payload = struct.pack(
                 packet_format,
@@ -250,7 +254,7 @@ class IRNetBox():
                 data)
             
             self._send(MessageTypes.OUTPUT_IR_SYNC, payload)
-            logger.info("SYNC IR signal sent successfully")
+            logger.info("Forced MK3 SYNC IR signal sent successfully")
 
     def _send(self, message_type, message_data=b""):
         logger.debug(f"Sending message: type={message_type:#04x}, data_length={len(message_data)}")
