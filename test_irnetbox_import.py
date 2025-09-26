@@ -15,7 +15,13 @@ def test_irnetbox_detection():
     print("🔍 Testing IRNetBox format detection...")
     
     # Import the detection function
-    from remoteservice_txt import detect_irnetbox_format
+    from app.services.remote_service import parse_irnetbox_file
+    def detect_irnetbox_format(filepath):
+        try:
+            parse_irnetbox_file(filepath)
+            return True
+        except:
+            return False
     
     # Create a temporary test file with IRNetBox format
     test_content = """Device Humax HDR-FOX T2
