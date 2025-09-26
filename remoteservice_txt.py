@@ -4,6 +4,7 @@ import json
 import binascii
 import base64
 import hashlib
+import re
 from datetime import datetime
 
 # Add the app directory to the path to import the database module
@@ -35,27 +36,32 @@ def detect_irnetbox_format(filepath):
     except Exception:
         return False
 
-def parse_irnetbox_file(filepath):
-    """Parse IRNetBox format file and extract signal data"""
+def parse_irnetbox_file(file_path):
+    """
+    Parse an IRNetBox format .txt file and return device name and signals.
+    
+    Returns:
+        tuple: (device_name, signals_dict)
+    """
     signals = {}
-    device_name = None
+    device_name = "Unknown"
     
-    print(f"Parsing IRNetBox file: {filepath}")
-    
-    with open(filepath, 'r') as f:
-        lines = f.readlines()
+    # Read the file
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
     
     i = 0
     while i < len(lines):
         line = lines[i].strip()
+        
+        # Skip empty lines
         if not line:
             i += 1
             continue
-            
-        # Extract device name from first line
-        if line.startswith('Device ') and device_name is None:
+        
+        # Parse device name from first line
+        if line.startswith('Device '):
             device_name = line.replace('Device ', '').strip()
-            print(f"Found device: {device_name}")
             i += 1
             continue
             
@@ -64,86 +70,51 @@ def parse_irnetbox_file(filepath):
             i += 1
             continue
             
-        # Parse signal lines: "0   DMOD_SIG   signal1 16 <hex_data>"
-        if 'DMOD_SIG' in line or 'MOD_SIG' in line:
+        # Parse signal lines (both MOD_SIG and DMOD_SIG)
+        if 'MOD_SIG' in line or 'DMOD_SIG' in line:
             # Skip documentation lines containing angle brackets
             if '<' in line and '>' in line:
                 i += 1
                 continue
                 
-            parts = line.split()
-            if len(parts) >= 4:
+            # Split by tabs for the IRNetBox format
+            parts = line.strip().split('\t')
+            
+            if 'DMOD_SIG' in line and len(parts) >= 4:
                 signal_name = parts[0]
-                sig_type = parts[1]  # DMOD_SIG or MOD_SIG
-                
-                # Skip if signal name is not alphanumeric (documentation line)
-                if not signal_name.replace('-', '').replace('_', '').replace('+', '').isalnum():
+                # DMOD_SIG format: signal_name \t DMOD_SIG \t signal1/signal2 \t max_lengths hex_data
+                signal_type = parts[2]  # 'signal1' or 'signal2'
+                # Parts[3] contains "max_lengths hex_data" combined, need to split
+                lengths_and_data = parts[3].strip().split(' ', 1)
+                if len(lengths_and_data) >= 2:
+                    max_lengths = int(lengths_and_data[0])
+                    hex_data = lengths_and_data[1].strip()
+                else:
                     i += 1
                     continue
-                
-                if sig_type == 'DMOD_SIG':
-                    # Double signal with signal1/signal2
-                    signal_variant = parts[2]  # signal1 or signal2
-                    try:
-                        max_lengths = int(parts[3])
-                        # Extract everything after the max_lengths value using regex-like approach
-                        import re
-                        pattern = f'\\s{max_lengths}\\s+(.*)$'
-                        match = re.search(pattern, line)
-                        hex_data = match.group(1).strip() if match else ""
-                    except (ValueError, IndexError):
-                        print(f"Error parsing line {i+1}: {line}")
-                        i += 1
-                        continue
-                    
-                    # Only use signal1 (primary signal) for double signals
-                    if signal_variant == 'signal1':
-                        key = signal_name
-                    else:
-                        i += 1
-                        continue  # Skip signal2
-                else:
-                    # Single signal MOD_SIG
-                    try:
-                        max_lengths = int(parts[2])
-                        # Extract everything after the max_lengths value using regex
-                        import re
-                        pattern = f'\\s{max_lengths}\\s+(.*)$'
-                        match = re.search(pattern, line)
-                        hex_data = match.group(1).strip() if match else ""
-                    except (ValueError, IndexError):
-                        print(f"Error parsing line {i+1}: {line}")
-                        i += 1
-                        continue
-                    key = signal_name
-                
-                # Collect multi-line hex data (look for line continuation)
+                # Only process signal1 for simplicity
+                if signal_type != 'signal1':
+                    i += 1
+                    continue
+                key = signal_name  # Use just the signal name, not the combined key
+            elif 'MOD_SIG' in line and 'DMOD_SIG' not in line and len(parts) >= 4:
+                signal_name = parts[0]
+                # MOD_SIG format: signal_name \t MOD_SIG \t max_lengths \t hex_data
+                max_lengths = int(parts[2])
+                hex_data = parts[3].strip()
+                key = signal_name
+            else:
                 i += 1
-                while i < len(lines):
-                    next_line = lines[i].strip()
-                    # If next line starts at column 1 and is pure hex digits, it's continuation
-                    if (next_line and 
-                        not next_line.split()[0].isalpha() and  # Not starting with a command/signal name
-                        all(c in '0123456789ABCDEFabcdef ' for c in next_line) and
-                        len(next_line.replace(' ', '')) > 50):  # Substantial hex data
-                        hex_data += next_line.replace(' ', '')
-                        i += 1
-                    else:
-                        break
-                
-                # Continue processing with accumulated hex_data
-                i -= 1  # Back up one line since we'll increment at the end of the loop
+                continue
                 
             # Convert hex string to bytes and analyze
-            # Initialize default values BEFORE try block
             frequency = 38000  # Default for consumer IR
             num_repeats = 1    # Default
-            actual_lengths = 6  # Default
             
             try:
                 if hex_data:
                     # Clean hex data - remove all non-hex characters
-                    import re
+                    import re  # Ensure re is available in this scope
                     clean_hex = re.sub(r'[^0-9A-Fa-f]', '', hex_data)
                     
                     # Handle odd-length hex strings (IRNetBox format may have nibble alignment)
@@ -157,87 +128,32 @@ def parse_irnetbox_file(filepath):
                         # Extract timer value (bytes 4-5, big-endian) and convert to frequency
                         timer_value = int.from_bytes(signal_bytes[4:6], byteorder='big')
                         if timer_value > 0:
-                            frequency = int(6000000.0 / (65536 - timer_value))
+                            frequency = int(1000000 / timer_value)  # Convert to Hz
                         
-                        # Extract actual number of lengths (bytes 8-9, big-endian, low byte only)
-                        if len(signal_bytes) >= 10:
-                            actual_lengths = signal_bytes[9]  # Low byte of lengths info
-                        
-                        # Extract timing lengths array from signal data
-                        timing_lengths = []
-                        if len(signal_bytes) >= 12 + (actual_lengths * 2):
-                            # Use precise timing values from official RedRat data (Humax POWER reference)
-                            standard_timings = [8.878, 4.535, 0.544, 1.7145000000000001, 0.63150000000000006, 1.418, 0.118, 0.1115, 0.1155, 0.0745, 0.326, 0.003, 0.134, 0.0825, 0.0165, 0.0090000000000000011, 0.005, 0.1155, 0.048, 0.056499999999999995, 0.0745, 0.075500000000000012, 0.1095, 2.3035]
-                            
-                            # Use standard timings up to actual_lengths, pad with defaults if needed
-                            for i in range(actual_lengths):
-                                if i < len(standard_timings):
-                                    timing_lengths.append(standard_timings[i])
-                                else:
-                                    # For signals with more lengths than our standard set, extract from signal
-                                    start_idx = 12 + (i * 2)
-                                    if start_idx + 2 <= len(signal_bytes):
-                                        length_val = int.from_bytes(signal_bytes[start_idx:start_idx+2], byteorder='big')
-                                        # Use a more conservative conversion for additional lengths
-                                        time_ms = length_val * 0.026  # Approximate calibration factor
-                                        timing_lengths.append(round(time_ms, 3))
-                                    else:
-                                        timing_lengths.append(0.1)  # Default fallback
-                        
-                        # Extract repeat count - specific handling for known signals
-                        pattern_start = 12 + (actual_lengths * 2)
-                        num_repeats = 1
-                        
-                        # Special case for Humax POWER signal (requires 2 repeats)
-                        if signal_name.upper() == 'POWER' and device_name and 'humax' in device_name.lower():
-                            num_repeats = 2
-                        elif len(signal_bytes) > pattern_start + 1:
-                            # Look for repeat count in pattern header for other signals
-                            potential_repeats = signal_bytes[pattern_start + 1]
-                            if 1 <= potential_repeats <= 50:  # Reasonable range
-                                num_repeats = potential_repeats
-                        
-                        # Extract pause timing (intra-pause from bytes 0-3)
-                        pause_ms = 0
-                        if len(signal_bytes) >= 4:
-                            intra_pause = int.from_bytes(signal_bytes[0:4], byteorder='little')
-                            # Special case for Humax POWER (47.52ms pause)
-                            if signal_name.upper() == 'POWER' and device_name and 'humax' in device_name.lower():
-                                pause_ms = 47.52
-                            else:
-                                # Convert intra-pause to milliseconds (approximate conversion)
-                                pause_ms = round(intra_pause * 0.000026, 3) if intra_pause > 0 else 0
+                        # Extract number of periods (bytes 6-7, big-endian)
+                        num_periods = int.from_bytes(signal_bytes[6:8], byteorder='big')
+                        if num_periods > 1:
+                            num_repeats = num_periods
                     
-                    # Convert to base64 for storage
-                    sigdata_b64 = base64.b64encode(signal_bytes).decode('utf-8')
+                    # Debug output
+                    print(f"Parsed signal {key}: freq={frequency}Hz, repeats={num_repeats}, data_len={len(signal_bytes)}")
                     
+                    # Store in signals dictionary
                     signals[key] = {
-                        'name': signal_name,
-                        'sig_type': sig_type,
-                        'max_lengths': actual_lengths,  # Use actual extracted count
+                        'name': key,
                         'frequency': frequency,
-                        'num_repeats': num_repeats,
-                        'pause_ms': pause_ms,  # Include pause timing
-                        'sigdata': sigdata_b64,
-                        'hex_data': hex_data,
-                        'timing_lengths': timing_lengths  # Include extracted timing lengths
+                        'data': binascii.hexlify(signal_bytes).decode('ascii').upper(),
+                        'repeats': num_repeats,
+                        'max_lengths': max_lengths
                     }
                     
-                    print(f"Parsed signal {key}: freq={frequency}Hz, repeats={num_repeats}, data_len={len(signal_bytes)}")
-                else:
-                    print(f"Skipping signal {key}: empty hex data")
-                    
             except Exception as e:
-                print(f"Error parsing hex data for signal {key}: {e}")
-        
+                print(f"Error processing signal {key}: {e}")
+            
+        # Move to next line
         i += 1
     
-    if not device_name:
-        device_name = "Unknown Device"
-        
-    print(f"Successfully parsed {len(signals)} signals for device '{device_name}'")
     return device_name, signals
-
 def create_template_data(signal_name, signal_info):
     """Create the complete template_data JSON with SigData"""
     
