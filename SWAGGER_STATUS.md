@@ -24,7 +24,7 @@ Generated on: 2025-07-17
 
 #### High Priority Missing:
 - `/api/remotes/{id}` - Individual remote operations (GET, PUT, DELETE)
-- `/api/remotes/import-xml` - XML import functionality
+- `/api/remotes/import-irnetbox` - IRNetBox format import functionality
 - `/api/commands/{id}/execute` - Command execution
 - `/api/sequences/{id}` - Individual sequence operations
 - `/api/sequences/{id}/execute` - Sequence execution

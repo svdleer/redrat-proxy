@@ -9,15 +9,16 @@
         </button>
     </div>
 
-    <!-- XML File Upload -->
+    <!-- IRNetBox File Upload -->
     <div class="bg-white rounded-lg shadow p-6 mb-8">
-        <h2 class="text-xl font-semibold mb-4">Upload Remotes XML</h2>
-        <form id="xmlUploadForm" enctype="multipart/form-data">
+        <h2 class="text-xl font-semibold mb-4">Upload IRNetBox Remote File</h2>
+        <p class="text-sm text-gray-600 mb-4">Upload IRNetBox format .txt files containing remote control IR signal data</p>
+        <form id="irnetboxUploadForm" enctype="multipart/form-data">
             <div class="flex items-center space-x-4">
-                <input type="file" name="xml_file" accept=".xml" required
+                <input type="file" name="txt_file" accept=".txt" required
                     class="file-input">
                 <button type="submit" class="btn-secondary">
-                    <i class="fas fa-upload mr-2"></i> Upload
+                    <i class="fas fa-upload mr-2"></i> Upload IRNetBox File
                 </button>
             </div>
         </form>

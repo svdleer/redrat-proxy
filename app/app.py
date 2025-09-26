@@ -430,26 +430,26 @@ def create_remote(user):
     
     return jsonify(remote)
     
-@app.route('/api/remotes/import-xml', methods=['POST'])
+@app.route('/api/remotes/import-irnetbox', methods=['POST'])
 @login_required()
-def import_xml(user):
-    """Import remotes from XML file"""
+def import_irnetbox(user):
+    """Import remotes from IRNetBox txt file"""
     import tempfile
     
-    if 'xml_file' not in request.files:
-        return jsonify({"error": "No XML file uploaded"}), 400
+    if 'txt_file' not in request.files:
+        return jsonify({"error": "No IRNetBox file uploaded"}), 400
         
-    xml_file = request.files['xml_file']
+    txt_file = request.files['txt_file']
     
-    if not xml_file or xml_file.filename == '':
+    if not txt_file or txt_file.filename == '':
         return jsonify({"error": "No file selected"}), 400
     
-    if not xml_file.filename.endswith('.xml'):
-        return jsonify({"error": "File must be an XML file"}), 400
+    if not txt_file.filename.endswith('.txt'):
+        return jsonify({"error": "File must be a txt file"}), 400
     
     # Save the file temporarily
-    temp_path = os.path.join(tempfile.gettempdir(), "remotes_import.xml")
-    xml_file.save(temp_path)
+    temp_path = os.path.join(tempfile.gettempdir(), "irnetbox_import.txt")
+    txt_file.save(temp_path)
     
     # Debug: Check the uploaded file
     app.logger.info(f"Saved uploaded file to: {temp_path}")
@@ -461,14 +461,22 @@ def import_xml(user):
         app.logger.error(f"Error reading uploaded file: {e}")
     
     try:
-        # Use the remote service to import XML
-        from app.services.remote_service import import_remotes_from_xml
+        # Import IRNetBox format using the existing logic
+        import sys
+        import os
         
-        imported_count = import_remotes_from_xml(temp_path, user['id'])
+        # Add the project root to path to import remoteservice_txt
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        
+        from remoteservice_txt import import_remotes_from_irnetbox
+        
+        imported_count = import_remotes_from_irnetbox(temp_path, user['id'])
         return jsonify({"message": "Import successful", "imported": imported_count}), 200
     except Exception as e:
-        app.logger.error(f"Error importing XML: {str(e)}")
-        return jsonify({"error": "Error importing XML", "message": str(e)}), 500
+        app.logger.error(f"Error importing IRNetBox file: {str(e)}")
+        return jsonify({"error": "Error importing IRNetBox file", "message": str(e)}), 500
     finally:
         # Clean up the temporary file
         if os.path.exists(temp_path):

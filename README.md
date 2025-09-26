@@ -36,47 +36,29 @@ The RedRat Proxy features a modern dashboard built with Tailwind CSS that includ
 
 ## Remote Management
 
-### XML Import for Remotes
+### IRNetBox Import for Remotes
 
-The system supports importing remote controls and their signals from RedRat XML files. This is useful for migrating existing RedRat configurations or adding new remotes in bulk.
+The system supports importing remote controls and their signals from IRNetBox format txt files. This replaces the previous XML import system and provides better compatibility with RedRat signal data.
 
-#### XML Format Structure
+#### IRNetBox Format Structure
 
-The import system supports the standard RedRat XML format:
+The import system supports the standard IRNetBox format:
 
-```xml
-<AVDeviceDB>
-  <AVDevices>
-    <AVDevice>
-      <Name>Remote Name</Name>
-      <Manufacturer>Manufacturer Name</Manufacturer>
-      <DeviceModelNumber>Model Number</DeviceModelNumber>
-      <RemoteModelNumber>Remote Model</RemoteModelNumber>
-      <DeviceType>DEVICE_TYPE</DeviceType>
-      <DecoderClass>Decoder Class Path</DecoderClass>
-      <RCCorrection>
-        <!-- Configuration settings -->
-      </RCCorrection>
-      <Signals>
-        <IRPacket xsi:type="ModulatedSignal">
-          <Name>Button Name</Name>
-          <UID>Signal UID</UID>
-          <ModulationFreq>36000</ModulationFreq>
-          <SigData>Signal Data Here</SigData>
-          <!-- Other signal properties -->
-        </IRPacket>
-        <!-- More signals -->
-      </Signals>
-    </AVDevice>
-    <!-- More devices -->
-  </AVDevices>
-</AVDeviceDB>
+```
+Device Humax HDR-FOX T2
+
+Signal data as IRNetBox data blocks
+
+POWER   DMOD_SIG   signal1 16 0000BE8C0117D900060C050C050C050C050C050C050C050C050C050C050C050C050C050C...
+POWER   DMOD_SIG   signal2 16 0000BE8C0117D900060C050C050C050C050C050C050C050C050C050C050C050C050C050C...
+GUIDE   MOD_SIG    8 050C050C050C050C050C050C050C050C050C050C050C050C050C050C050C050C...
+UP      MOD_SIG    8 050C050C050C050C050C050C050C050C050C050C050C050C050C050C050C050C...
 ```
 
-#### Importing XML Files
+#### Importing IRNetBox Files
 
 1. Navigate to the Admin > Remotes page
-2. Use the "Upload Remotes XML" panel to select and upload your XML file
+2. Use the "Upload IRNetBox Remote File" panel to select and upload your .txt file
 3. The system will process the file and create or update remotes in the database
 4. Signal data will be saved as command templates, making them available for use in commands and sequences
 
@@ -104,9 +86,9 @@ The `config_data` field stores additional configuration parameters from the XML 
 
 ### Command Templates
 
-When importing remotes from XML, the system automatically creates command templates for each signal. These templates are used to send commands to the RedRat IrNetBox.
+When importing remotes from IRNetBox format files, the system automatically creates command templates for each signal. These templates are used to send commands to the RedRat IrNetBox.
 
-Note: Support for .irdb files has been removed in favor of XML-only imports.
+Note: XML import has been replaced with IRNetBox format imports for better signal compatibility.
 
 ## Installation & Deployment
 

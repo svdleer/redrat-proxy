@@ -23,7 +23,7 @@ async function apiCall(url, options = {}) {
 document.addEventListener('DOMContentLoaded', () => {
     // Remote form handling
     const remoteForm = document.getElementById('remoteForm');
-    const xmlForm = document.getElementById('xmlUploadForm');
+    const irnetboxForm = document.getElementById('irnetboxUploadForm');
     
     if (remoteForm) {
         remoteForm.addEventListener('submit', async (e) => {
@@ -59,19 +59,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    if (xmlForm) {
-        xmlForm.addEventListener('submit', async (e) => {
+    if (irnetboxForm) {
+        irnetboxForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const formData = new FormData(xmlForm);
+            const formData = new FormData(irnetboxForm);
             
             try {
                 // Show loading indicator
-                const submitBtn = xmlForm.querySelector('button[type="submit"]');
+                const submitBtn = irnetboxForm.querySelector('button[type="submit"]');
                 const originalContent = submitBtn.innerHTML;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Uploading...';
                 submitBtn.disabled = true;
                 
-                const response = await apiCall('/api/remotes/import-xml', {
+                const response = await apiCall('/api/remotes/import-irnetbox', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -87,15 +87,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (response.ok) {
                     const result = await response.json();
-                    alert(`Import successful: ${result.imported} remotes imported.`);
+                    alert(`Import successful: ${result.imported} signals imported.`);
                     window.location.reload();
                 } else {
                     const error = await response.json();
-                    alert(`Error uploading XML: ${error.message || 'Unknown error'}`);
+                    alert(`Error uploading IRNetBox file: ${error.message || 'Unknown error'}`);
                 }
             } catch (error) {
-                console.error('Error uploading XML:', error);
-                alert('Error uploading XML file');
+                console.error('Error uploading IRNetBox file:', error);
+                alert('Error uploading IRNetBox file');
             }
         });
     }
