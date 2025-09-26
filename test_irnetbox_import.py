@@ -74,11 +74,10 @@ UP      MOD_SIG    8 050C050C050C050C050C050C050C050C050C050C050C050C050C050C050
     finally:
         os.unlink(test_file)
 
-def test_import_functionality():
-    """Test the complete import functionality without database operations"""
-    print("🔍 Testing import functionality (dry run)...")
-    
-    from remoteservice_txt import parse_irnetbox_file, create_template_data
+def test_template_data_creation():
+    """Test creating template data from signal info"""
+    from app.services.remote_service import parse_irnetbox_file
+    # Note: create_template_data is now internal to the service - test via full import
     
     # Create a temporary test file
     test_content = """Device Test Remote
@@ -201,9 +200,9 @@ if __name__ == "__main__":
         if os.path.exists(test_file):
             print(f"🔍 Testing with provided file: {test_file}")
             try:
-                from remoteservice_txt import import_remotes_from_irnetbox
+                from app.services.remote_service import import_remotes_from_irnetbox
                 # Note: This would require a user_id, so we'll just test parsing
-                from remoteservice_txt import parse_irnetbox_file
+                from app.services.remote_service import parse_irnetbox_file
                 
                 device_name, signals = parse_irnetbox_file(test_file)
                 print(f"✅ File parsed successfully:")

@@ -31,13 +31,19 @@ UP      MOD_SIG    8 050C050C050C050C050C050C050C050C050C050C050C050C050C050C050
     try:
         # Test 1: File parsing
         print("📋 Test 1: File Format Detection")
-        from remoteservice_txt import detect_irnetbox_format
+        from app.services.remote_service import parse_irnetbox_file
+        def detect_irnetbox_format(filepath):
+            try:
+                parse_irnetbox_file(filepath)
+                return True
+            except:
+                return False
         is_valid = detect_irnetbox_format(test_file)
         print(f"   Format Valid: {'✅' if is_valid else '❌'} {is_valid}")
         
         # Test 2: Parsing
         print("\n📋 Test 2: Signal Parsing")
-        from remoteservice_txt import parse_irnetbox_file
+        from app.services.remote_service import parse_irnetbox_file
         device_name, signals = parse_irnetbox_file(test_file)
         print(f"   Device: ✅ {device_name}")
         print(f"   Signals: ✅ {len(signals)} found")
@@ -46,7 +52,7 @@ UP      MOD_SIG    8 050C050C050C050C050C050C050C050C050C050C050C050C050C050C050
         
         # Test 3: Template Creation
         print("\n📋 Test 3: Template Data Creation")
-        from remoteservice_txt import create_template_data
+        # create_template_data is now internal to service
         for signal_name, signal_info in signals.items():
             signal_info['device_name'] = device_name
             signal_info['remote_id'] = 1  # Mock ID

@@ -32,7 +32,8 @@ GUIDE   MOD_SIG    8 050C050C050C050C050C050C050C050C050C050C050C050C050C050C050
     try:
         # Test the parsing functionality
         print("📋 Step 1: Testing file parsing...")
-        from remoteservice_txt import parse_irnetbox_file, create_template_data
+        from app.services.remote_service import parse_irnetbox_file
+        # create_template_data is now internal to service
         
         device_name, signals = parse_irnetbox_file(test_file)
         print(f"   ✅ Device: {device_name}")
