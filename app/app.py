@@ -461,16 +461,8 @@ def import_irnetbox(user):
         app.logger.error(f"Error reading uploaded file: {e}")
     
     try:
-        # Import IRNetBox format using the existing logic
-        import sys
-        import os
-        
-        # Add the project root to path to import remoteservice_txt
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        if project_root not in sys.path:
-            sys.path.insert(0, project_root)
-        
-        from remoteservice_txt import import_remotes_from_irnetbox
+        # Use the remote service to import IRNetBox
+        from app.services.remote_service import import_remotes_from_irnetbox
         
         imported_count = import_remotes_from_irnetbox(temp_path, user['id'])
         return jsonify({"message": "Import successful", "imported": imported_count}), 200
