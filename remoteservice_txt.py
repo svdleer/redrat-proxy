@@ -168,12 +168,12 @@ def create_template_data(signal_name, signal_info):
         "uid": uid,
         "lengths": lengths,
         "frequency": signal_info['frequency'],
-        "num_repeats": signal_info['num_repeats'],
+        "num_repeats": signal_info.get('repeats', 1),  # Use 'repeats' key from parsed data
         "pause_ms": signal_info.get('pause_ms', 0),  # Include pause timing
-        "sigdata": signal_info['sigdata'],  # Complete IR signal data
+        "sigdata": signal_info.get('data', ''),  # Use 'data' key from parsed data
         "device_type": signal_info.get('device_name', 'IRNetBox Device'),
-        "signal_type": signal_info['sig_type'],
-        "max_lengths": signal_info['max_lengths'],
+        "signal_type": "IRNetBox",  # Set a default signal type
+        "max_lengths": signal_info.get('max_lengths', 16),  # Default max_lengths
         "remote_id": signal_info.get('remote_id')  # Link to remotes table
     }
     
