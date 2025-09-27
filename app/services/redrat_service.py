@@ -56,6 +56,8 @@ class RedRatService:
         self.port = port
         self.timeout = timeout
         self._lock = threading.Lock()
+        # Track alternation state for double signals (signal1 <-> signal2)
+        self._alternation_state = {}  # Key: (remote_id, base_command), Value: 'signal1' or 'signal2'
         
     def validate_device_and_port(self, ir_port: int = 1) -> Dict[str, Any]:
         """Validate that the RedRat device is accessible and the IR port is valid.
@@ -297,7 +299,7 @@ class RedRatService:
         return result
     
     def _get_command_template(self, remote_id: int, command_name: str) -> Optional[Dict[str, Any]]:
-        """Get command template data from database.
+        """Get command template data from database with automatic alternation between signal1 and signal2.
         
         Args:
             remote_id: Database ID of the remote
@@ -314,35 +316,45 @@ class RedRatService:
                     
                 cursor = conn.cursor()
                 
-                # The database stores individual command records, not grouped by signals
-                # Look for a template that matches the command name and remote_id
                 logger.debug(f"Looking for template: command='{command_name}', remote_id={remote_id}")
                 
-                # First try: Direct match on command name for this remote
-                cursor.execute("""
-                    SELECT ct.template_data 
-                    FROM command_templates ct
-                    WHERE ct.name = %s
-                    AND JSON_EXTRACT(ct.template_data, '$.remote_id') = %s
-                """, (command_name, remote_id))
+                # PRIORITY: Check for alternating double signals first (signal1/signal2)
+                # This gives precedence to IRNetBox double signals over single commands
+                signal1_name = f"{command_name}_signal1"
+                signal2_name = f"{command_name}_signal2"
                 
-                result = cursor.fetchone()
-                if result:
-                    logger.debug(f"Found template for command '{command_name}' on remote {remote_id}")
-                    template_data = result[0]
+                cursor.execute("""
+                    SELECT ct.name, ct.template_data 
+                    FROM command_templates ct
+                    WHERE ct.name IN (%s, %s)
+                    AND JSON_EXTRACT(ct.template_data, '$.remote_id') = %s
+                    ORDER BY ct.name
+                """, (signal1_name, signal2_name, remote_id))
+                
+                signals = cursor.fetchall()
+                if len(signals) == 2:  # Both signal1 and signal2 exist
+                    # Implement alternation logic
+                    alternation_key = (remote_id, command_name)
+                    current_signal = self._alternation_state.get(alternation_key, 'signal2')  # Start with signal2 so first call uses signal1
                     
-                    # Parse the template data
-                    if isinstance(template_data, bytes):
-                        template_data = template_data.decode('utf-8')
+                    # Alternate between signal1 and signal2
+                    next_signal = 'signal1' if current_signal == 'signal2' else 'signal2'
+                    self._alternation_state[alternation_key] = next_signal
                     
-                    if isinstance(template_data, str):
-                        parsed_data = json.loads(template_data)
-                    else:
-                        parsed_data = template_data
+                    # Find the template data for the selected signal
+                    selected_template = None
+                    for signal_name, template_data in signals:
+                        if signal_name == f"{command_name}_{next_signal}":
+                            selected_template = template_data
+                            break
                     
-                    # The database format is already the correct format for individual commands
-                    # Just return it as-is
-                    return parsed_data
+                    if selected_template:
+                        logger.info(f"🔄 Alternating to {next_signal} for command '{command_name}' on remote {remote_id}")
+                        return self._parse_template_data(selected_template)
+                
+                elif len(signals) == 1:  # Only one signal variant exists
+                    logger.debug(f"Found single signal variant for command '{command_name}' on remote {remote_id}")
+                    return self._parse_template_data(signals[0][1])
                 
                 # Fallback: try without remote_id check (for any remote)
                 cursor.execute("""
@@ -355,18 +367,21 @@ class RedRatService:
                 result = cursor.fetchone()
                 if result:
                     logger.debug(f"Found fallback template for command '{command_name}' (any remote)")
-                    template_data = result[0]
-                    
-                    # Parse the template data
-                    if isinstance(template_data, bytes):
-                        template_data = template_data.decode('utf-8')
-                    
-                    if isinstance(template_data, str):
-                        parsed_data = json.loads(template_data)
-                    else:
-                        parsed_data = template_data
-                    
-                    return parsed_data
+                    return self._parse_template_data(result[0])
+                
+                # Final fallback: check for double signals without remote_id
+                cursor.execute("""
+                    SELECT ct.name, ct.template_data 
+                    FROM command_templates ct
+                    WHERE ct.name IN (%s, %s)
+                    ORDER BY ct.name
+                    LIMIT 2
+                """, (signal1_name, signal2_name))
+                
+                signals = cursor.fetchall()
+                if signals:
+                    logger.debug(f"Found fallback signal variants for command '{command_name}' (any remote)")
+                    return self._parse_template_data(signals[0][1])
                 
                 logger.warning(f"No template found for command '{command_name}' on remote {remote_id}")
                 cursor.close()
@@ -376,6 +391,30 @@ class RedRatService:
             logger.error(f"Error getting command template: {e}")
             import traceback
             traceback.print_exc()
+            return None
+    
+    def _parse_template_data(self, template_data) -> Optional[Dict[str, Any]]:
+        """Parse template data from database format to dictionary.
+        
+        Args:
+            template_data: Raw template data from database (bytes, str, or dict)
+            
+        Returns:
+            Parsed template data as dictionary
+        """
+        try:
+            # Parse the template data
+            if isinstance(template_data, bytes):
+                template_data = template_data.decode('utf-8')
+            
+            if isinstance(template_data, str):
+                parsed_data = json.loads(template_data)
+            else:
+                parsed_data = template_data
+            
+            return parsed_data
+        except Exception as e:
+            logger.error(f"Error parsing template data: {e}")
             return None
     
     def _convert_template_to_ir_data(self, template_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:

@@ -57,8 +57,10 @@ def parse_irnetbox_content(content):
                 else:
                     i += 1
                     continue
-                # For DMOD_SIG, create separate keys for signal1 and signal2
-                key = f"{signal_name}_{signal_type}"
+                if signal_type != 'signal1':
+                    i += 1
+                    continue
+                key = signal_name
             elif 'MOD_SIG' in line and 'DMOD_SIG' not in line and len(parts) >= 4:
                 signal_name = parts[0]
                 max_lengths = int(parts[2])
@@ -83,8 +85,7 @@ def parse_irnetbox_content(content):
                     if len(signal_bytes) >= 12:
                         timer_value = int.from_bytes(signal_bytes[4:6], byteorder='big')
                         if timer_value > 0:
-                            # IRNetBox uses 2.5GHz base frequency for timer calculation
-                            frequency = int(2500000000 / timer_value)
+                            frequency = int(1000000 / timer_value)
                         
                         num_periods = int.from_bytes(signal_bytes[6:8], byteorder='big')
                         if num_periods > 1:
@@ -113,6 +114,91 @@ def parse_irnetbox_file(file_path):
         content = file.read()
     
     return parse_irnetbox_content(content)
+    
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        
+        if not line:
+            i += 1
+            continue
+        
+        if line.startswith('Device '):
+            device_name = line.replace('Device ', '').strip()
+            i += 1
+            continue
+            
+        if 'Signal data as IRNetBox' in line or 'Note:' in line or 'Where signals' in line:
+            i += 1
+            continue
+            
+        if 'MOD_SIG' in line or 'DMOD_SIG' in line:
+            if '<' in line and '>' in line:
+                i += 1
+                continue
+                
+            parts = line.strip().split('\t')
+            
+            if 'DMOD_SIG' in line and len(parts) >= 4:
+                signal_name = parts[0]
+                signal_type = parts[2]
+                lengths_and_data = parts[3].strip().split(' ', 1)
+                if len(lengths_and_data) >= 2:
+                    max_lengths = int(lengths_and_data[0])
+                    hex_data = lengths_and_data[1].strip()
+                else:
+                    i += 1
+                    continue
+                if signal_type != 'signal1':
+                    i += 1
+                    continue
+                key = signal_name
+            elif 'MOD_SIG' in line and 'DMOD_SIG' not in line and len(parts) >= 4:
+                signal_name = parts[0]
+                max_lengths = int(parts[2])
+                hex_data = parts[3].strip()
+                key = signal_name
+            else:
+                i += 1
+                continue
+                
+            frequency = 38000
+            num_repeats = 1
+            
+            try:
+                if hex_data:
+                    clean_hex = re.sub(r'[^0-9A-Fa-f]', '', hex_data)
+                    
+                    if len(clean_hex) % 2 == 1:
+                        clean_hex = '0' + clean_hex
+                        
+                    signal_bytes = binascii.unhexlify(clean_hex)
+                    
+                    if len(signal_bytes) >= 12:
+                        timer_value = int.from_bytes(signal_bytes[4:6], byteorder='big')
+                        if timer_value > 0:
+                            frequency = int(1000000 / timer_value)
+                        
+                        num_periods = int.from_bytes(signal_bytes[6:8], byteorder='big')
+                        if num_periods > 1:
+                            num_repeats = num_periods
+                    
+                    print(f"Parsed signal {key}: freq={frequency}Hz, repeats={num_repeats}, data_len={len(signal_bytes)}")
+                    
+                    signals[key] = {
+                        'name': key,
+                        'frequency': frequency,
+                        'data': binascii.hexlify(signal_bytes).decode('ascii').upper(),
+                        'repeats': num_repeats,
+                        'max_lengths': max_lengths
+                    }
+                    
+            except Exception as e:
+                print(f"Error processing signal {key}: {e}")
+            
+        i += 1
+    
+    return device_name, signals
 
 def import_remotes_to_db(remotes, user_id=None):
     """Import the remotes into the database"""
