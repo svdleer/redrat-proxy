@@ -70,7 +70,9 @@ UP      MOD_SIG    8 050C050C050C050C050C050C050C050C050C050C050C050C050C050C050
         with patch('app.services.remote_service.import_irnetbox_func', side_effect=mock_import_function):
             try:
                 from app.services.remote_service import import_remotes_from_irnetbox
-                result = import_remotes_from_irnetbox(test_file, 1)
+                with open(test_file, 'r') as f:
+                    content = f.read()
+                result = import_remotes_from_irnetbox(content, 1)
                 print(f"   Service Import: ✅ {result} signals imported")
             except Exception as e:
                 print(f"   Service Import: ❌ {e}")

@@ -461,10 +461,13 @@ def import_irnetbox(user):
         app.logger.error(f"Error reading uploaded file: {e}")
     
     try:
-        # Use the remote service to import IRNetBox
+        # Read the file content and use the remote service to import IRNetBox
+        with open(temp_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
         from app.services.remote_service import import_remotes_from_irnetbox
         
-        imported_count = import_remotes_from_irnetbox(temp_path, user['id'])
+        imported_count = import_remotes_from_irnetbox(content, user['id'])
         return jsonify({"message": "Import successful", "imported": imported_count}), 200
     except Exception as e:
         app.logger.error(f"Error importing IRNetBox file: {str(e)}")

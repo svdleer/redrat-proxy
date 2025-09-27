@@ -202,9 +202,11 @@ if __name__ == "__main__":
             try:
                 from app.services.remote_service import import_remotes_from_irnetbox
                 # Note: This would require a user_id, so we'll just test parsing
-                from app.services.remote_service import parse_irnetbox_file
+                from app.services.remote_service import parse_irnetbox_content
                 
-                device_name, signals = parse_irnetbox_file(test_file)
+                with open(test_file, 'r') as f:
+                    content = f.read()
+                device_name, signals = parse_irnetbox_content(content)
                 print(f"✅ File parsed successfully:")
                 print(f"   Device: {device_name}")
                 print(f"   Signals: {len(signals)}")
