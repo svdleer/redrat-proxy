@@ -539,7 +539,16 @@ def remote_detail(user, remote_id):
             if not cursor.fetchone():
                 return jsonify({"error": "Remote not found"}), 404
             
-            # Delete the remote
+            # Delete related command templates first (they reference remote_id in JSON)
+            cursor.execute(
+                "DELETE FROM command_templates WHERE JSON_EXTRACT(template_data, '$.remote_id') = %s", 
+                (remote_id,)
+            )
+            
+            # Delete related remote files
+            cursor.execute("DELETE FROM remote_files WHERE name IN (SELECT name FROM remotes WHERE id = %s)", (remote_id,))
+            
+            # Delete the remote (this will cascade delete commands, sequences, etc. due to foreign keys)
             cursor.execute("DELETE FROM remotes WHERE id = %s", (remote_id,))
             conn.commit()
             

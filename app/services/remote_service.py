@@ -330,7 +330,8 @@ def import_remotes_to_db(remotes, user_id=None):
                     'no_repeats': signal.get('no_repeats', 1),
                     'intra_sig_pause': signal.get('intra_sig_pause', 0.0),
                     'lengths': signal.get('lengths', []),
-                    'toggle_data': signal.get('toggle_data', [])
+                    'toggle_data': signal.get('toggle_data', []),
+                    'max_lengths': signal.get('max_lengths', 16)
                 }
                 
                 cursor.execute(
