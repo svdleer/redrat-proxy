@@ -16,13 +16,104 @@ except ImportError:
     # Fall back to relative import (when importing within the package)
     from ..mysql_db import db
 
-def parse_irnetbox_file(file_path):
-    """Parse an IRNetBox format .txt file and return device name and signals."""
+def parse_irnetbox_content(content):
+    """Parse IRNetBox content and return device name and signals."""
     signals = {}
     device_name = "Unknown"
     
+    lines = content.split('\n')
+    
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        
+        if not line:
+            i += 1
+            continue
+        
+        if line.startswith('Device '):
+            device_name = line.replace('Device ', '').strip()
+            i += 1
+            continue
+            
+        if 'Signal data as IRNetBox' in line or 'Note:' in line or 'Where signals' in line:
+            i += 1
+            continue
+            
+        if 'MOD_SIG' in line or 'DMOD_SIG' in line:
+            if '<' in line and '>' in line:
+                i += 1
+                continue
+                
+            parts = line.strip().split('\t')
+            
+            if 'DMOD_SIG' in line and len(parts) >= 4:
+                signal_name = parts[0]
+                signal_type = parts[2]
+                lengths_and_data = parts[3].strip().split(' ', 1)
+                if len(lengths_and_data) >= 2:
+                    max_lengths = int(lengths_and_data[0])
+                    hex_data = lengths_and_data[1].strip()
+                else:
+                    i += 1
+                    continue
+                if signal_type != 'signal1':
+                    i += 1
+                    continue
+                key = signal_name
+            elif 'MOD_SIG' in line and 'DMOD_SIG' not in line and len(parts) >= 4:
+                signal_name = parts[0]
+                max_lengths = int(parts[2])
+                hex_data = parts[3].strip()
+                key = signal_name
+            else:
+                i += 1
+                continue
+                
+            frequency = 38000
+            num_repeats = 1
+            
+            try:
+                if hex_data:
+                    clean_hex = re.sub(r'[^0-9A-Fa-f]', '', hex_data)
+                    
+                    if len(clean_hex) % 2 == 1:
+                        clean_hex = '0' + clean_hex
+                        
+                    signal_bytes = binascii.unhexlify(clean_hex)
+                    
+                    if len(signal_bytes) >= 12:
+                        timer_value = int.from_bytes(signal_bytes[4:6], byteorder='big')
+                        if timer_value > 0:
+                            frequency = int(1000000 / timer_value)
+                        
+                        num_periods = int.from_bytes(signal_bytes[6:8], byteorder='big')
+                        if num_periods > 1:
+                            num_repeats = num_periods
+                    
+                    print(f"Parsed signal {key}: freq={frequency}Hz, repeats={num_repeats}, data_len={len(signal_bytes)}")
+                    
+                    signals[key] = {
+                        'name': key,
+                        'frequency': frequency,
+                        'data': binascii.hexlify(signal_bytes).decode('ascii').upper(),
+                        'repeats': num_repeats,
+                        'max_lengths': max_lengths
+                    }
+                    
+            except Exception as e:
+                print(f"Error processing signal {key}: {e}")
+            
+        i += 1
+    
+    return device_name, signals
+
+def parse_irnetbox_file(file_path):
+    """Parse an IRNetBox format .txt file and return device name and signals."""
     with open(file_path, 'r') as file:
-        lines = file.readlines()
+        content = file.read()
+    
+    return parse_irnetbox_content(content)
     
     i = 0
     while i < len(lines):
@@ -269,10 +360,10 @@ def import_remotes_to_db(remotes, user_id=None):
                 
     return imported_count
 
-def import_remotes_from_irnetbox(txt_path, user_id):
-    """Import remotes from an IRNetBox txt file"""
-    # Parse the IRNetBox file
-    device_name, signals = parse_irnetbox_file(txt_path)
+def import_remotes_from_irnetbox(txt_content, user_id):
+    """Import remotes from IRNetBox txt content"""
+    # Parse the IRNetBox content
+    device_name, signals = parse_irnetbox_content(txt_content)
     print(f"Found device '{device_name}' with {len(signals)} signals in IRNetBox file")
     
     if not signals:
@@ -302,7 +393,11 @@ def import_remotes_from_irnetbox(txt_path, user_id):
         ]
     }]
     
+    # Count total signals across all remotes
+    total_signals = sum(len(remote.get('signals', [])) for remote in remotes)
+    
     # Import the remotes to the database
     imported = import_remotes_to_db(remotes, user_id)
     
-    return imported
+    # Return the number of signals imported
+    return total_signals
