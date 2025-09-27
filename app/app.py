@@ -560,7 +560,7 @@ def remote_detail(user, remote_id):
 @app.route('/api/remotes/<int:remote_id>/commands', methods=['GET'])
 @login_required()
 def get_remote_commands(user, remote_id):
-    """Get available commands for a specific remote"""
+    """Get available commands for a specific remote - showing only base commands for clean UI"""
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -572,9 +572,26 @@ def get_remote_commands(user, remote_id):
             """, (remote_id,))
             
             commands = []
+            seen_commands = set()  # Track base command names to avoid duplicates
+            
             for row in cursor.fetchall():
                 command_name = row[0]
                 template_data = row[1]
+                
+                # Skip _signal2 variants to show only one command per logical button
+                if command_name.endswith('_signal2'):
+                    continue
+                
+                # For _signal1 commands, show clean name without suffix
+                display_name = command_name
+                if command_name.endswith('_signal1'):
+                    display_name = command_name.rsplit('_signal1', 1)[0]
+                
+                # Skip if we've already seen this base command
+                if display_name in seen_commands:
+                    continue
+                seen_commands.add(display_name)
+                
                 # Parse template data to get UID if needed
                 try:
                     import json
@@ -584,7 +601,7 @@ def get_remote_commands(user, remote_id):
                     uid = ''
                 
                 commands.append({
-                    'name': command_name,
+                    'name': display_name,  # Use clean name for display
                     'uid': uid
                 })
             
