@@ -887,7 +887,11 @@ def admin_remotes(user):
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT r.id, r.name, r.manufacturer, r.device_type, 
-                       COUNT(ct.id) as command_count
+                       COUNT(DISTINCT CASE 
+                           WHEN ct.name LIKE '%_signal1' THEN SUBSTRING(ct.name, 1, CHAR_LENGTH(ct.name) - 8)
+                           WHEN ct.name LIKE '%_signal2' THEN SUBSTRING(ct.name, 1, CHAR_LENGTH(ct.name) - 8)
+                           ELSE ct.name 
+                       END) as command_count
                 FROM remotes r
                 LEFT JOIN command_templates ct ON JSON_EXTRACT(ct.template_data, '$.remote_id') = r.id
                 GROUP BY r.id, r.name, r.manufacturer, r.device_type
@@ -932,36 +936,63 @@ def redrat_remotes_redirect(user):
 @app.route('/api/command-templates', methods=['GET'])
 @login_required()
 def get_command_templates(user):
-    """Get all command templates with remote info"""
+    """Get all command templates with remote info - showing only base commands for clean UI"""
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT ct.id, ct.file_id, ct.name, ct.device_type, ct.template_data,
-                       rf.name as remote_name, rf.filename
+                SELECT ct.id, ct.name, ct.template_data, r.name as remote_name, r.id as remote_id
                 FROM command_templates ct
-                JOIN remote_files rf ON ct.file_id = rf.id
-                ORDER BY rf.name, ct.name
+                JOIN remotes r ON JSON_EXTRACT(ct.template_data, '$.remote_id') = r.id
+                ORDER BY r.name, ct.name
             """)
             
             templates = []
+            seen_commands = set()  # Track base command names to avoid duplicates
+            
             for row in cursor.fetchall():
+                command_name = row[1]  # ct.name
+                remote_name = row[3]   # r.name
+                
+                # Skip _signal2 variants to show only one command per logical button
+                if command_name.endswith('_signal2'):
+                    continue
+                
+                # For _signal1 commands, show clean name without suffix
+                display_name = command_name
+                if command_name.endswith('_signal1'):
+                    display_name = command_name.rsplit('_signal1', 1)[0]
+                
+                # Skip if we've already seen this base command
+                remote_command_key = f"{remote_name}:{display_name}"
+                if remote_command_key in seen_commands:
+                    continue
+                seen_commands.add(remote_command_key)
+                
                 # Handle bytes data in template_data
-                template_data = row[4]
+                template_data = row[2]  # ct.template_data
                 if isinstance(template_data, bytes):
                     try:
                         template_data = template_data.decode('utf-8')
                     except UnicodeDecodeError:
                         template_data = str(template_data)
                 
+                # Parse template data to get device_type
+                device_type = ''
+                try:
+                    import json
+                    parsed_data = json.loads(template_data) if isinstance(template_data, str) else template_data
+                    device_type = parsed_data.get('device_type', '')
+                except:
+                    pass
+                
                 templates.append({
-                    'id': row[0],
-                    'file_id': row[1],
-                    'command_name': row[2],
-                    'device_type': row[3],
+                    'id': row[0],          # ct.id
+                    'remote_id': row[4],   # r.id 
+                    'command_name': display_name,  # Show clean name
+                    'device_type': device_type,
                     'template_data': template_data,
-                    'remote_name': row[5],
-                    'filename': row[6]
+                    'remote_name': remote_name
                 })
             
             return jsonify(templates)
