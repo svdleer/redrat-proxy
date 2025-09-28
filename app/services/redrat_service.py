@@ -18,8 +18,8 @@ from contextlib import contextmanager
 from typing import Dict, Any, Optional, List
 import binascii
 
-# Import the original redratlib functionality
-from .redratlib import IRNetBox, RemoteControlConfig
+# Import the new irnetbox_lib_new functionality
+from .irnetbox_lib_new import IRNetBox
 
 try:
     from app.mysql_db import db
@@ -87,11 +87,16 @@ class RedRatService:
             logger.debug(f"Testing connectivity to RedRat device at {self.host}:{self.port}")
             
             with self._lock:
-                with IRNetBox(self.host, self.port) as ir:
-                    # Power on device to ensure it's ready
-                    ir.power_on()
-                    result['device_accessible'] = True
-                    logger.debug(f"RedRat device accessible, IR port {ir_port} ready")
+                ir = IRNetBox(self.host)
+                try:
+                    if ir.connect():
+                        result['device_accessible'] = True
+                        logger.debug(f"RedRat device accessible, IR port {ir_port} ready")
+                    else:
+                        result['error'] = "Failed to connect to RedRat device"
+                        return result
+                finally:
+                    ir.disconnect()
             
             result['success'] = True
             
@@ -274,17 +279,21 @@ class RedRatService:
         try:
             start_time = time.time()
             
-            with IRNetBox(self.host, self.port) as ir:
-                result['device_info'] = {
-                    'model': ir.irnetbox_model,
-                    'ports': ir.ports,
-                    'host': self.host,
-                    'port': self.port
-                }
-                
-                # Test basic functionality
-                ir.power_on()
-                ir.indicators_on()
+            ir = IRNetBox(self.host)
+            try:
+                if ir.connect():
+                    device_info = ir.get_device_info()
+                    result['device_info'] = {
+                        'model': device_info['device_type'],
+                        'ports': 16,  # Standard for IRNetBox
+                        'host': self.host,
+                        'port': self.port
+                    }
+                else:
+                    result['message'] = "Failed to connect to RedRat device"
+                    return result
+            finally:
+                ir.disconnect()
                 
                 result['response_time'] = time.time() - start_time
                 result['success'] = True
@@ -462,23 +471,36 @@ class RedRatService:
                         }
                     
             elif 'IRPacket' in template_data:
-                # IRPacket format
+                # IRPacket format from XML
                 ir_packet = template_data['IRPacket']
                 if 'SigData' in ir_packet:
                     sig_data = ir_packet['SigData']
                     if isinstance(sig_data, str):
-                        # Clean the hex string
-                        cleaned_sig_data = ''.join(c for c in sig_data if c in '0123456789abcdefABCDEF')
-                        if cleaned_sig_data:
-                            if len(cleaned_sig_data) % 2 != 0:
-                                cleaned_sig_data = '0' + cleaned_sig_data
-                            ir_data = binascii.unhexlify(cleaned_sig_data)
+                        # SigData from XML is base64-encoded, not hex
+                        try:
+                            import base64
+                            ir_data = base64.b64decode(sig_data)
+                            logger.debug(f"Decoded base64 SigData: {len(ir_data)} bytes")
                             return {
                                 'ir_data': ir_data,
                                 'modulation_freq': ir_params['modulation_freq'],
                                 'no_repeats': ir_params['no_repeats'],
                                 'intra_sig_pause': ir_params['intra_sig_pause']
                             }
+                        except Exception as e:
+                            logger.warning(f"Failed to decode base64 SigData, trying hex: {e}")
+                            # Fallback to hex if base64 fails
+                            cleaned_sig_data = ''.join(c for c in sig_data if c in '0123456789abcdefABCDEF')
+                            if cleaned_sig_data:
+                                if len(cleaned_sig_data) % 2 != 0:
+                                    cleaned_sig_data = '0' + cleaned_sig_data
+                                ir_data = binascii.unhexlify(cleaned_sig_data)
+                                return {
+                                    'ir_data': ir_data,
+                                    'modulation_freq': ir_params['modulation_freq'],
+                                    'no_repeats': ir_params['no_repeats'],
+                                    'intra_sig_pause': ir_params['intra_sig_pause']
+                                }
                         
             elif 'signal_data' in template_data or 'sig_data' in template_data:
                 # Database format - signal_data is binary data encoded as base64 or raw bytes
@@ -588,32 +610,59 @@ class RedRatService:
                 logger.info(f"Modulation frequency: {modulation_freq}Hz")
             
             with self._lock:  # Ensure thread safety
-                with IRNetBox(self.host, self.port) as ir:
-                    # Ensure device is powered on and ready
-                    logger.debug(f"Powering on RedRat device and preparing port {ir_port}")
-                    ir.power_on()
-                    
-                    # Turn on indicators for visual feedback
-                    ir.indicators_on()
-                    
-                    # Small delay to ensure device is ready
-                    time.sleep(0.1)
-                    
-                    # Validate port number is within reasonable range
-                    if not (1 <= ir_port <= 16):
-                        result['error'] = f"Invalid IR port {ir_port}. Must be between 1 and 16"
+                # Validate port number is within reasonable range
+                if not (1 <= ir_port <= 16):
+                    result['error'] = f"Invalid IR port {ir_port}. Must be between 1 and 16"
+                    return result
+                
+                ir = IRNetBox(self.host)
+                try:
+                    # Connect to device
+                    logger.debug(f"Connecting to RedRat device at {self.host}")
+                    if not ir.connect():
+                        result['error'] = "Failed to connect to RedRat device"
                         return result
                     
                     logger.debug(f"Device ready, sending IR signal to port {ir_port}")
                     
-                    # Send the IR signal with specified number of repeats
-                    for repeat in range(no_repeats):
-                        if repeat > 0:
-                            logger.debug(f"Sending repeat {repeat + 1} of {no_repeats}")
-                            # Apply inter-signal pause (convert ms to seconds)
-                            time.sleep(intra_sig_pause / 1000.0)
-                        
-                        ir.irsend_raw(ir_port, power, ir_data)
+                    # Create IRSignal object from the data
+                    from .irnetbox_lib_new import IRSignal, OutputConfig, PowerLevel
+                    
+                    # Map power percentage to PowerLevel enum
+                    if power >= 75:
+                        power_level = PowerLevel.HIGH
+                    elif power >= 50:
+                        power_level = PowerLevel.MEDIUM
+                    elif power >= 25:
+                        power_level = PowerLevel.LOW
+                    else:
+                        power_level = PowerLevel.OFF
+                    
+                    # Create signal object
+                    signal = IRSignal(
+                        name=f"Command_{ir_port}",
+                        uid=f"cmd_{ir_port}_{int(time.time())}",
+                        modulation_freq=modulation_freq or 38000,  # Default to 38kHz if not specified
+                        lengths=[],  # Empty for raw data
+                        sig_data=ir_data,
+                        no_repeats=no_repeats,
+                        intra_sig_pause=intra_sig_pause
+                    )
+                    
+                    # Send the signal using ASYNC protocol
+                    output_configs = [OutputConfig(port=ir_port, power_level=power_level)]
+                    
+                    # Force ASYNC mode for MK-III/MK-IV devices
+                    if hasattr(ir, 'device_type') and ir.device_type.value in ['MK-III', 'MK-IV']:
+                        # Use async protocol with sequence number and proper timing
+                        seq_num = ir.send_signal_async(signal, output_configs, post_delay_ms=500, enforce_timing=True)
+                        logger.info(f"Sent ASYNC signal with sequence {seq_num}")
+                    else:
+                        # Fallback to regular send for older devices
+                        ir.send_signal(signal, [ir_port], power_level)
+                    
+                finally:
+                    ir.disconnect()
                     
                     logger.debug(f"IR command completed successfully on port {ir_port}")
                     result['success'] = True
