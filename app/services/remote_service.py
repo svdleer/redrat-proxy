@@ -1,9 +1,8 @@
 import sys
 import os
+import xml.etree.ElementTree as ET
 import json
 import datetime
-import binascii
-import re
 
 # Add the app directory to the path to import the database module
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../..'))
@@ -16,103 +15,178 @@ except ImportError:
     # Fall back to relative import (when importing within the package)
     from ..mysql_db import db
 
-def parse_irnetbox_content(content):
-    """Parse IRNetBox content and return device name and signals."""
-    signals = {}
-    device_name = "Unknown"
-    
-    lines = content.split('\n')
-    
-    i = 0
-    while i < len(lines):
-        line = lines[i].strip()
+def process_single_signal(signal_elem, override_name, signals, remote_name):
+    """Process a single signal element and add it to the signals list"""
+    name = signal_elem.find('Name')
+    if name is None:
+        # Try alternative tag name
+        name = signal_elem.find('n')
         
-        if not line:
-            i += 1
-            continue
-        
-        if line.startswith('Device '):
-            device_name = line.replace('Device ', '').strip()
-            i += 1
-            continue
-            
-        if 'Signal data as IRNetBox' in line or 'Note:' in line or 'Where signals' in line:
-            i += 1
-            continue
-            
-        if 'MOD_SIG' in line or 'DMOD_SIG' in line:
-            if '<' in line and '>' in line:
-                i += 1
-                continue
-                
-            parts = line.strip().split('\t')
-            
-            if 'DMOD_SIG' in line and len(parts) >= 4:
-                signal_name = parts[0]
-                signal_type = parts[2]
-                lengths_and_data = parts[3].strip().split(' ', 1)
-                if len(lengths_and_data) >= 2:
-                    max_lengths = int(lengths_and_data[0])
-                    hex_data = lengths_and_data[1].strip()
-                else:
-                    i += 1
-                    continue
-                # For DMOD_SIG, create separate keys for signal1 and signal2
-                key = f"{signal_name}_{signal_type}"
-            elif 'MOD_SIG' in line and 'DMOD_SIG' not in line and len(parts) >= 4:
-                signal_name = parts[0]
-                max_lengths = int(parts[2])
-                hex_data = parts[3].strip()
-                key = signal_name
-            else:
-                i += 1
-                continue
-                
-            frequency = 38000
-            num_repeats = 1
-            
-            try:
-                if hex_data:
-                    clean_hex = re.sub(r'[^0-9A-Fa-f]', '', hex_data)
-                    
-                    if len(clean_hex) % 2 == 1:
-                        clean_hex = '0' + clean_hex
-                        
-                    signal_bytes = binascii.unhexlify(clean_hex)
-                    
-                    if len(signal_bytes) >= 12:
-                        timer_value = int.from_bytes(signal_bytes[4:6], byteorder='big')
-                        if timer_value > 0:
-                            # IRNetBox uses 2.5GHz base frequency for timer calculation
-                            frequency = int(2500000000 / timer_value)
-                        
-                        num_periods = int.from_bytes(signal_bytes[6:8], byteorder='big')
-                        if num_periods > 1:
-                            num_repeats = num_periods
-                    
-                    print(f"Parsed signal {key}: freq={frequency}Hz, repeats={num_repeats}, data_len={len(signal_bytes)}")
-                    
-                    signals[key] = {
-                        'name': key,
-                        'frequency': frequency,
-                        'data': binascii.hexlify(signal_bytes).decode('ascii').upper(),
-                        'repeats': num_repeats,
-                        'max_lengths': max_lengths
-                    }
-                    
-            except Exception as e:
-                print(f"Error processing signal {key}: {e}")
-            
-        i += 1
+    # Use override name if provided, otherwise use the element's name
+    signal_name = override_name if override_name else (name.text if name is not None else None)
     
-    return device_name, signals
+    uid_elem = signal_elem.find('UID')
+    mod_freq_elem = signal_elem.find('ModulationFreq')
+    sig_data_elem = signal_elem.find('SigData')
+    
+    # Get additional signal parameters
+    no_repeats_elem = signal_elem.find('NoRepeats')
+    intra_sig_pause_elem = signal_elem.find('IntraSigPause')
+    
+    # Extract Lengths array
+    lengths = []
+    lengths_elem = signal_elem.find('Lengths')
+    if lengths_elem is not None:
+        for length_elem in lengths_elem.findall('double'):
+            if length_elem.text:
+                lengths.append(float(length_elem.text))
+    
+    # Extract ToggleData
+    toggle_data = []
+    toggle_data_elem = signal_elem.find('ToggleData')
+    if toggle_data_elem is not None:
+        for toggle_bit in toggle_data_elem.findall('ToggleBit'):
+            bit_no = toggle_bit.find('bitNo')
+            len1 = toggle_bit.find('len1')
+            len2 = toggle_bit.find('len2')
+            if bit_no is not None and len1 is not None and len2 is not None:
+                toggle_data.append({
+                    'bitNo': int(bit_no.text) if bit_no.text else 0,
+                    'len1': int(len1.text) if len1.text else 0,
+                    'len2': int(len2.text) if len2.text else 0
+                })
+    
+    # Only add signals with complete data
+    if (signal_name and 
+        uid_elem is not None and uid_elem.text and
+        sig_data_elem is not None and sig_data_elem.text):
+        
+        signal_data = {
+            'name': signal_name,
+            'uid': uid_elem.text,
+            'modulation_freq': mod_freq_elem.text if mod_freq_elem is not None else "36000",
+            'sig_data': sig_data_elem.text,
+            'no_repeats': int(no_repeats_elem.text) if no_repeats_elem is not None and no_repeats_elem.text else 1,
+            'intra_sig_pause': float(intra_sig_pause_elem.text) if intra_sig_pause_elem is not None and intra_sig_pause_elem.text else 0.0,
+            'lengths': lengths,
+            'toggle_data': toggle_data
+        }
+        signals.append(signal_data)
+        print(f"Added signal '{signal_name}' with {len(lengths)} lengths and {len(toggle_data)} toggle bits")
+        return True
+    else:
+        skip_reason = []
+        if not signal_name:
+            skip_reason.append("no name")
+        if uid_elem is None or not uid_elem.text:
+            skip_reason.append("no UID")
+        if sig_data_elem is None or not sig_data_elem.text:
+            skip_reason.append("no SigData")
+        print(f"Skipped signal: {', '.join(skip_reason)}")
+        return False
 
-def parse_irnetbox_file(file_path):
-    """Parse an IRNetBox format .txt file and return device name and signals."""
-    with open(file_path, 'r') as file:
-        content = file.read()
+def parse_remotes_xml(xml_path):
+    """Parse the remotes XML file and return a list of remote devices with their commands"""
+    try:
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+        print(f"Root element: {root.tag}")
+        print(f"Root namespace: {root.nsmap if hasattr(root, 'nsmap') else 'N/A'}")
+    except Exception as e:
+        print(f"Error parsing XML file: {e}")
+        return []
     
-    return parse_irnetbox_content(content)
+    remotes = []
+    
+    # Debug: Print all child elements
+    print(f"Root children: {[child.tag for child in root]}")
+    
+    # Try different ways to find AVDevice elements
+    avdevices_container = root.find('AVDevices')
+    if avdevices_container is not None:
+        print(f"Found AVDevices container with {len(list(avdevices_container))} children")
+        devices = avdevices_container.findall('AVDevice')
+    else:
+        print("AVDevices container not found, searching directly")
+        devices = root.findall('.//AVDevice')
+    
+    print(f"Found {len(devices)} AVDevice elements")
+    
+    # Loop through all AVDevice elements
+    for device in devices:
+        remote_name = device.find('Name')
+        if remote_name is None:
+            # Try alternative tag name
+            remote_name = device.find('n')
+            
+        # Skip if no name found
+        if remote_name is None or not remote_name.text:
+            print("Skipping device with no name")
+            continue
+            
+        remote_name = remote_name.text
+        print(f"Processing device: {remote_name}")
+        
+        manufacturer = device.find('Manufacturer').text if device.find('Manufacturer') is not None else None
+        device_model = device.find('DeviceModelNumber').text if device.find('DeviceModelNumber') is not None else None
+        remote_model = device.find('RemoteModelNumber').text if device.find('RemoteModelNumber') is not None else None
+        device_type = device.find('DeviceType').text if device.find('DeviceType') is not None else None
+        decoder_class = device.find('DecoderClass').text if device.find('DecoderClass') is not None else None
+        
+        # Extract configuration data
+        config = {}
+        for config_elem in ['RCCorrection', 'CreateDelta', 'DecodeDelta', 'DoubleSignals', 'KeyboardSignals', 'XMP1Signals']:
+            if device.find(config_elem) is not None:
+                # Convert to string to avoid bytes serialization issues
+                config[config_elem] = ET.tostring(device.find(config_elem), encoding='unicode')
+        
+        signals = []
+        
+        # Look for signals in the Signals container
+        signals_container = device.find('Signals')
+        if signals_container is not None:
+            print(f"Found Signals container with {len(list(signals_container))} IRPacket elements")
+            signal_elements = signals_container.findall('IRPacket')
+        else:
+            print("Signals container not found, searching for IRPacket elements directly")
+            signal_elements = device.findall('.//IRPacket')
+        
+        print(f"Found {len(signal_elements)} IRPacket elements for device {remote_name}")
+        
+        for signal in signal_elements:
+            # Handle regular signals and DoubleSignal containers
+            signal_type = signal.get('{http://www.w3.org/2001/XMLSchema-instance}type', '')
+            
+            if signal_type == 'DoubleSignal':
+                # Handle DoubleSignal type (contains Signal1 and Signal2)
+                # A DoubleSignal should be treated as ONE command, not split into separate entries
+                name = signal.find('Name')
+                if name is not None and name.text:
+                    # Use Signal1 as the primary signal (as per RedRat documentation)
+                    signal1 = signal.find('Signal1')
+                    if signal1 is not None:
+                        # Process as a single command with the original name (no _Signal1 suffix)
+                        process_single_signal(signal1, name.text, signals, remote_name)
+                    else:
+                        print(f"Warning: DoubleSignal '{name.text}' has no Signal1")
+                else:
+                    print("Skipped DoubleSignal: no name")
+            else:
+                # Handle regular ModulatedSignal
+                process_single_signal(signal, None, signals, remote_name)
+        
+        remotes.append({
+            'name': remote_name,
+            'manufacturer': manufacturer,
+            'device_model_number': device_model,
+            'remote_model_number': remote_model,
+            'device_type': device_type,
+            'decoder_class': decoder_class,
+            'config_data': config,
+            'signals': signals
+        })
+    
+    return remotes
 
 def import_remotes_to_db(remotes, user_id=None):
     """Import the remotes into the database"""
@@ -204,7 +278,7 @@ def import_remotes_to_db(remotes, user_id=None):
             })
             
             # Create a filename based on the remote name
-            filename = f"{remote['name'].replace(' ', '_')}.txt"
+            filename = f"{remote['name'].replace(' ', '_')}.xml"
             filepath = f"static/remote_files/{filename}"
             
             # Make sure the directory exists
@@ -244,8 +318,7 @@ def import_remotes_to_db(remotes, user_id=None):
                     'no_repeats': signal.get('no_repeats', 1),
                     'intra_sig_pause': signal.get('intra_sig_pause', 0.0),
                     'lengths': signal.get('lengths', []),
-                    'toggle_data': signal.get('toggle_data', []),
-                    'max_lengths': signal.get('max_lengths', 16)
+                    'toggle_data': signal.get('toggle_data', [])
                 }
                 
                 cursor.execute(
@@ -275,44 +348,16 @@ def import_remotes_to_db(remotes, user_id=None):
                 
     return imported_count
 
-def import_remotes_from_irnetbox(txt_content, user_id):
-    """Import remotes from IRNetBox txt content"""
-    # Parse the IRNetBox content
-    device_name, signals = parse_irnetbox_content(txt_content)
-    print(f"Found device '{device_name}' with {len(signals)} signals in IRNetBox file")
+def import_remotes_from_xml(xml_path, user_id):
+    """Import remotes from an XML file"""
+    # Parse the XML file
+    remotes = parse_remotes_xml(xml_path)
+    print(f"Found {len(remotes)} remotes in XML file")
     
-    if not signals:
+    if not remotes:
         return 0
-    
-    # Convert to format expected by import_remotes_to_db
-    remotes = [{
-        'name': device_name,
-        'manufacturer': 'IRNetBox',
-        'device_model_number': None,
-        'remote_model_number': None,
-        'device_type': 'IRNetBox',
-        'decoder_class': None,
-        'config_data': {},
-        'signals': [
-            {
-                'name': signal_name,
-                'uid': f"irnetbox_{signal_name}",
-                'modulation_freq': str(signal_data['frequency']),
-                'sig_data': signal_data['data'],
-                'no_repeats': signal_data['repeats'],
-                'intra_sig_pause': 0.0,
-                'lengths': [],
-                'toggle_data': []
-            }
-            for signal_name, signal_data in signals.items()
-        ]
-    }]
-    
-    # Count total signals across all remotes
-    total_signals = sum(len(remote.get('signals', [])) for remote in remotes)
     
     # Import the remotes to the database
     imported = import_remotes_to_db(remotes, user_id)
     
-    # Return the number of signals imported
-    return total_signals
+    return imported

@@ -18,6 +18,7 @@ source /app/venv/bin/activate
 
 # Set Python path
 export PYTHONPATH="/app"
+export PATH="/app/venv/bin:$PATH"
 
 # Create necessary directories
 echo "📁 Creating application directories..."
@@ -31,7 +32,7 @@ chmod -R 777 /app/logs
 
 # Initialize database if needed
 echo "🗃️ Initializing database..."
-python -c "
+/app/venv/bin/python -c "
 import sys
 sys.path.append('/app')
 try:
@@ -48,5 +49,11 @@ echo "🚀 Starting Flask application..."
 echo "🌐 Application will be available at http://localhost:5000"
 echo "📝 Logs will be written to /app/logs/"
 
-# Execute the main command
-exec "$@"
+# Ensure we're using the virtual environment's Python
+echo "🐍 Using Python from venv: $(which python)"
+echo "📦 Checking if dotenv is installed..."
+/app/venv/bin/python -c "import dotenv; print('✅ dotenv is available')" || echo "❌ dotenv not found"
+
+# Start Flask app with venv python
+/app/venv/bin/python app.py
+~           

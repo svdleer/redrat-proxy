@@ -1,9 +1,9 @@
-FROM python:3.9-slim
+FROM python:3.13-slim
 
 # Install required dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    gcc python3-dev libmariadb-dev-compat libmariadb-dev libjpeg-dev zlib1g-dev curl && \
+    gcc python3-dev python3-venv libmariadb-dev-compat libmariadb-dev libjpeg-dev zlib1g-dev curl && \
     rm -rf /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip
@@ -32,7 +32,7 @@ ENV PYTHONPATH="/app"
 EXPOSE 5000
 
 # Verify installed packages for debugging
-RUN . venv/bin/activate && pip list
+# RUN /app/venv/bin/pip list
 
 # Add entrypoint script to the container
 COPY docker-entrypoint-new.sh /app/
