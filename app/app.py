@@ -2056,7 +2056,7 @@ def create_schedule(user):
                   properties:
                     time:
                       type: string
-                      pattern: "^\\d{2}:\\d{2}:\\d{2}$"
+                      pattern: "^\\\\d{2}:\\\\d{2}:\\\\d{2}$"
                       example: "18:30:00"
                 - title: Weekly
                   properties:
@@ -2068,7 +2068,7 @@ def create_schedule(user):
                       description: Day of week (0=Sunday, 1=Monday, etc.)
                     time:
                       type: string
-                      pattern: "^\\d{2}:\\d{2}:\\d{2}$"
+                      pattern: "^\\\\d{2}:\\\\d{2}:\\\\d{2}$"
                       example: "09:00:00"
                 - title: Monthly
                   properties:
@@ -2080,7 +2080,7 @@ def create_schedule(user):
                       description: Day of month
                     time:
                       type: string
-                      pattern: "^\\d{2}:\\d{2}:\\d{2}$"
+                      pattern: "^\\\\d{2}:\\\\d{2}:\\\\d{2}$"
                       example: "14:00:00"
     responses:
       201:
