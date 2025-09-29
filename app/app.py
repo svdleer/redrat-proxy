@@ -6,6 +6,7 @@ import uuid
 import sys
 import time
 import tempfile
+import threading
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -92,6 +93,52 @@ try:
 except Exception as e:
     print(f"⚠️  Database initialization failed: {e}")
     print("🔧 Application will continue without database - please fix and restart")
+
+# Background Scheduler Daemon
+def scheduler_daemon():
+    """Background daemon that processes scheduled tasks every minute"""
+    print("🕒 Scheduler daemon starting...")
+    
+    while True:
+        try:
+            print("🕒 Scheduler: Attempting to import SchedulingService...")
+            # Import here to avoid circular imports
+            from app.services.scheduling_service import SchedulingService
+            print("🕒 Scheduler: SchedulingService imported successfully")
+            
+            # Process due tasks
+            print("🕒 Scheduler: Processing due tasks...")
+            count = SchedulingService.process_due_tasks()
+            
+            if count > 0:
+                print(f"🕒 Scheduler: Processed {count} scheduled task(s)")
+            else:
+                print("🕒 Scheduler: No due tasks found")
+            
+            # Wait 60 seconds before next check
+            time.sleep(60)
+            
+        except Exception as e:
+            print(f"⚠️  Scheduler daemon error: {e}")
+            import traceback
+            print(f"⚠️  Full error traceback: {traceback.format_exc()}")
+            # Continue running even if there's an error
+            time.sleep(60)
+
+# Start scheduler daemon in background thread
+def start_scheduler():
+    """Start the scheduler daemon as a background thread"""
+    scheduler_thread = threading.Thread(target=scheduler_daemon, daemon=True)
+    scheduler_thread.start()
+    print("✅ Scheduler daemon started in background thread")
+
+# Start scheduler after a short delay to allow app to fully initialize
+def delayed_scheduler_start():
+    time.sleep(5)  # Wait 5 seconds for app to initialize
+    start_scheduler()
+
+# Start the delayed scheduler in a separate thread
+threading.Thread(target=delayed_scheduler_start, daemon=True).start()
 
 # Add current datetime and request to all templates
 @app.context_processor
@@ -1271,9 +1318,9 @@ def get_sequence(user, sequence_id):
             # Get commands for this sequence
             cursor.execute("""
                 SELECT sc.id, sc.command, sc.device, sc.remote_id, sc.position, sc.delay_ms,
-                       rf.name as remote_name, sc.ir_port, sc.power
+                       r.name as remote_name, sc.ir_port, sc.power
                 FROM sequence_commands sc
-                JOIN remote_files rf ON sc.remote_id = rf.id
+                JOIN remotes r ON sc.remote_id = r.id
                 WHERE sc.sequence_id = %s
                 ORDER BY sc.position
             """, (sequence_id,))
@@ -1640,9 +1687,9 @@ def add_command_to_sequence(user, sequence_id):
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT ct.name, ct.file_id, rf.name as remote_name
+                SELECT ct.name, ct.file_id, r.name as remote_name
                 FROM command_templates ct
-                JOIN remote_files rf ON ct.file_id = rf.id
+                JOIN remotes r ON ct.file_id = r.id
                 WHERE ct.id = %s
             """, (command_id,))
             
@@ -1691,6 +1738,112 @@ def remove_command_from_sequence(user, sequence_id, command_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/sequences/<int:sequence_id>/commands/<int:command_id>/move-up', methods=['PUT'])
+@login_required()
+def move_command_up(user, sequence_id, command_id):
+    """Move a command up in the sequence"""
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Get current command position
+            cursor.execute("""
+                SELECT position FROM sequence_commands
+                WHERE id = %s AND sequence_id = %s
+            """, (command_id, sequence_id))
+            
+            result = cursor.fetchone()
+            if not result:
+                return jsonify({'success': False, 'error': 'Command not found in sequence'}), 404
+            
+            current_position = result[0]
+            if current_position <= 1:
+                return jsonify({'success': False, 'error': 'Command is already at the top'}), 400
+            
+            # Swap positions with the command above
+            target_position = current_position - 1
+            
+            # Find command at target position
+            cursor.execute("""
+                SELECT id FROM sequence_commands
+                WHERE sequence_id = %s AND position = %s
+            """, (sequence_id, target_position))
+            
+            target_command = cursor.fetchone()
+            if not target_command:
+                return jsonify({'success': False, 'error': 'No command found at target position'}), 400
+            
+            # Swap positions
+            cursor.execute("""
+                UPDATE sequence_commands SET position = %s WHERE id = %s
+            """, (target_position, command_id))
+            
+            cursor.execute("""
+                UPDATE sequence_commands SET position = %s WHERE id = %s
+            """, (current_position, target_command[0]))
+            
+            conn.commit()
+            return jsonify({'success': True, 'message': 'Command moved up successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sequences/<int:sequence_id>/commands/<int:command_id>/move-down', methods=['PUT'])
+@login_required()
+def move_command_down(user, sequence_id, command_id):
+    """Move a command down in the sequence"""
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Get current command position and max position
+            cursor.execute("""
+                SELECT position FROM sequence_commands
+                WHERE id = %s AND sequence_id = %s
+            """, (command_id, sequence_id))
+            
+            result = cursor.fetchone()
+            if not result:
+                return jsonify({'success': False, 'error': 'Command not found in sequence'}), 404
+            
+            current_position = result[0]
+            
+            # Get max position for this sequence
+            cursor.execute("""
+                SELECT MAX(position) FROM sequence_commands
+                WHERE sequence_id = %s
+            """, (sequence_id,))
+            
+            max_position = cursor.fetchone()[0]
+            if current_position >= max_position:
+                return jsonify({'success': False, 'error': 'Command is already at the bottom'}), 400
+            
+            # Swap positions with the command below
+            target_position = current_position + 1
+            
+            # Find command at target position
+            cursor.execute("""
+                SELECT id FROM sequence_commands
+                WHERE sequence_id = %s AND position = %s
+            """, (sequence_id, target_position))
+            
+            target_command = cursor.fetchone()
+            if not target_command:
+                return jsonify({'success': False, 'error': 'No command found at target position'}), 400
+            
+            # Swap positions
+            cursor.execute("""
+                UPDATE sequence_commands SET position = %s WHERE id = %s
+            """, (target_position, command_id))
+            
+            cursor.execute("""
+                UPDATE sequence_commands SET position = %s WHERE id = %s
+            """, (current_position, target_command[0]))
+            
+            conn.commit()
+            return jsonify({'success': True, 'message': 'Command moved down successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/sequences/<int:sequence_id>/execute', methods=['POST'])
 @login_required()
 def execute_sequence(user, sequence_id):
@@ -1712,9 +1865,9 @@ def execute_sequence(user, sequence_id):
             # Get commands for this sequence
             cursor.execute("""
                 SELECT sc.id, sc.command, sc.device, sc.remote_id, sc.position, sc.delay_ms,
-                       rf.name as remote_name, sc.ir_port, sc.power
+                       r.name as remote_name, sc.ir_port, sc.power
                 FROM sequence_commands sc
-                JOIN remote_files rf ON sc.remote_id = rf.id
+                JOIN remotes r ON sc.remote_id = r.id
                 WHERE sc.sequence_id = %s
                 ORDER BY sc.position
             """, (sequence_id,))
@@ -1763,142 +1916,428 @@ def execute_sequence(user, sequence_id):
 @app.route('/api/schedules', methods=['GET'])
 @login_required()
 def get_schedules(user):
-    """Get all schedules for the current user"""
+    """
+    Get all scheduled tasks for the current user
+    ---
+    tags:
+      - Schedules
+    security:
+      - SessionAuth: []
+    responses:
+      200:
+        description: List of scheduled tasks
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            schedules:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "550e8400-e29b-41d4-a716-446655440000"
+                  name:
+                    type: string
+                    example: "Sequence Schedule - Daily"
+                  type:
+                    type: string
+                    enum: ["command", "sequence"]
+                    example: "sequence"
+                  target_id:
+                    type: string
+                    example: "2"
+                  schedule_type:
+                    type: string
+                    enum: ["once", "daily", "weekly", "monthly"]
+                    example: "daily"
+                  schedule_data:
+                    type: object
+                    example: {"time": "18:30:00"}
+                  next_run:
+                    type: string
+                    format: date-time
+                    example: "2025-09-29T18:30:00"
+                  last_run:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    example: null
+                  status:
+                    type: string
+                    enum: ["pending", "active", "paused", "completed"]
+                    example: "active"
+                  created_at:
+                    type: string
+                    format: date-time
+                    example: "2025-09-29T16:42:47"
+      401:
+        description: Authentication required
+      500:
+        description: Server error
+    """
     try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT s.id, s.name, s.type, s.target_id, s.schedule_type, 
-                       s.schedule_data, s.next_run, s.last_run, s.status, s.created_at
-                FROM schedules s
-                WHERE s.created_by = %s
-                ORDER BY s.created_at DESC
-            """, (user['id'],))
+        from app.services.scheduling_service import SchedulingService
+        
+        # Get tasks from the SchedulingService (scheduled_tasks table)
+        tasks = SchedulingService.get_all_tasks(user_id=str(user['id']))
+        
+        schedules = []
+        for task in tasks:
+            schedules.append({
+                'id': task.id,
+                'name': f"{task.type.title()} Schedule - {task.schedule_type.title()}",
+                'type': task.type,
+                'target_id': task.target_id,
+                'schedule_type': task.schedule_type,
+                'schedule_data': task.schedule_data,
+                'next_run': task.next_run.isoformat() if task.next_run else None,
+                'last_run': task.last_run.isoformat() if task.last_run else None,
+                'status': task.status,
+                'created_at': task.created_at.isoformat()
+            })
             
-            schedules = []
-            for row in cursor.fetchall():
-                # Parse schedule_data if it exists
-                schedule_data = row[5]
-                if schedule_data:
-                    if isinstance(schedule_data, str):
-                        schedule_data = json.loads(schedule_data)
-                    elif isinstance(schedule_data, bytes):
-                        schedule_data = json.loads(schedule_data.decode('utf-8'))
-                
-                schedules.append({
-                    'id': row[0],
-                    'name': row[1],
-                    'type': row[2],
-                    'target_id': row[3],
-                    'schedule_type': row[4],
-                    'schedule_data': schedule_data,
-                    'next_run': row[6].isoformat() if row[6] else None,
-                    'last_run': row[7].isoformat() if row[7] else None,
-                    'status': row[8],
-                    'created_at': row[9].isoformat()
-                })
-            
-            return jsonify({'success': True, 'schedules': schedules})
+        return jsonify({'success': True, 'schedules': schedules})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/schedules', methods=['POST'])
 @login_required()
 def create_schedule(user):
-    """Create a new schedule"""
+    """
+    Create a new scheduled task
+    ---
+    tags:
+      - Schedules
+    security:
+      - SessionAuth: []
+    parameters:
+      - in: body
+        name: body
+        description: Schedule configuration
+        required: true
+        schema:
+          type: object
+          required:
+            - type
+            - target_id
+            - schedule_type
+            - schedule_data
+          properties:
+            type:
+              type: string
+              enum: ["command", "sequence"]
+              example: "sequence"
+              description: Type of task to schedule
+            target_id:
+              type: string
+              example: "2"
+              description: ID of the command or sequence to schedule
+            schedule_type:
+              type: string
+              enum: ["once", "daily", "weekly", "monthly"]
+              example: "daily"
+              description: Schedule frequency type
+            schedule_data:
+              type: object
+              description: Schedule-specific configuration
+              example: {"time": "18:30:00"}
+              oneOf:
+                - title: Once
+                  properties:
+                    datetime:
+                      type: string
+                      format: date-time
+                      example: "2025-09-29T19:15:00"
+                - title: Daily
+                  properties:
+                    time:
+                      type: string
+                      pattern: "^\\d{2}:\\d{2}:\\d{2}$"
+                      example: "18:30:00"
+                - title: Weekly
+                  properties:
+                    day:
+                      type: integer
+                      minimum: 0
+                      maximum: 6
+                      example: 1
+                      description: Day of week (0=Sunday, 1=Monday, etc.)
+                    time:
+                      type: string
+                      pattern: "^\\d{2}:\\d{2}:\\d{2}$"
+                      example: "09:00:00"
+                - title: Monthly
+                  properties:
+                    day:
+                      type: integer
+                      minimum: 1
+                      maximum: 31
+                      example: 15
+                      description: Day of month
+                    time:
+                      type: string
+                      pattern: "^\\d{2}:\\d{2}:\\d{2}$"
+                      example: "14:00:00"
+    responses:
+      201:
+        description: Schedule created successfully
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            message:
+              type: string
+              example: "Schedule created successfully"
+            schedule:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+                name:
+                  type: string
+                  example: "Sequence Schedule - Daily"
+                type:
+                  type: string
+                  example: "sequence"
+                target_id:
+                  type: string
+                  example: "2"
+                schedule_type:
+                  type: string
+                  example: "daily"
+                schedule_data:
+                  type: object
+                  example: {"time": "18:30:00"}
+                next_run:
+                  type: string
+                  format: date-time
+                  example: "2025-09-29T18:30:00"
+                status:
+                  type: string
+                  example: "active"
+      400:
+        description: Invalid request data
+      401:
+        description: Authentication required
+      500:
+        description: Server error
+    """
     try:
+        from app.services.scheduling_service import SchedulingService
+        
         data = request.get_json()
-        
-        # Generate a name based on the schedule type and target
-        schedule_name = f"{data['type'].title()} Schedule - {data['schedule_type'].title()}"
-        
-        # Calculate next run time based on schedule type
-        next_run = None
         schedule_data = data.get('schedule_data', {})
         
-        if data['schedule_type'] == 'once':
-            # For 'once' type, use the provided datetime
-            if 'datetime' in schedule_data:
-                next_run = schedule_data['datetime']
-        elif data['schedule_type'] == 'daily':
-            # For daily, use today's date with the provided time
-            if 'time' in schedule_data:
-                from datetime import datetime, date
-                today = date.today()
-                time_str = schedule_data['time']
-                next_run = f"{today} {time_str}:00"
-        elif data['schedule_type'] == 'weekly':
-            # For weekly, calculate next occurrence
-            if 'day' in schedule_data and 'time' in schedule_data:
-                # Simplified: use current date + time for now
-                from datetime import datetime
-                next_run = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        elif data['schedule_type'] == 'monthly':
-            # For monthly, calculate next occurrence
-            if 'day' in schedule_data and 'time' in schedule_data:
-                # Simplified: use current date + time for now
-                from datetime import datetime
-                next_run = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # Create the scheduled task using SchedulingService
+        task = SchedulingService.schedule_task(
+            task_type=data['type'],
+            target_id=data['target_id'],
+            schedule_type=data['schedule_type'],
+            schedule_data=schedule_data,
+            user_id=str(user['id'])
+        )
         
-        # If next_run is still None, default to current time
-        if not next_run:
-            from datetime import datetime
-            next_run = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO schedules (name, type, target_id, schedule_type, schedule_data, 
-                                     next_run, status, created_by)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                schedule_name,
-                data['type'],
-                data['target_id'],
-                data['schedule_type'],
-                json.dumps(schedule_data),
-                next_run,
-                'active',
-                user['id']
-            ))
-            
-            schedule_id = cursor.lastrowid
-            conn.commit()
-            
-            return jsonify({
-                'success': True, 
-                'message': 'Schedule created successfully',
-                'schedule': {
-                    'id': schedule_id,
-                    'name': schedule_name,
-                    'type': data['type'],
-                    'target_id': data['target_id'],
-                    'schedule_type': data['schedule_type'],
-                    'schedule_data': schedule_data,
-                    'next_run': next_run,
-                    'status': 'active'
-                }
-            }), 201
+        return jsonify({
+            'success': True,
+            'message': 'Schedule created successfully',
+            'schedule': {
+                'id': task.id,
+                'name': f"{task.type.title()} Schedule - {task.schedule_type.title()}",
+                'type': task.type,
+                'target_id': task.target_id,
+                'schedule_type': task.schedule_type,
+                'schedule_data': task.schedule_data,
+                'next_run': task.next_run.isoformat() if task.next_run else None,
+                'status': task.status
+            }
+        }), 201
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/schedules/<int:schedule_id>', methods=['DELETE'])
+@app.route('/api/schedules/<string:schedule_id>', methods=['PUT'])
+@login_required()
+def update_schedule(user, schedule_id):
+    """
+    Update an existing scheduled task
+    ---
+    tags:
+      - Schedules
+    security:
+      - SessionAuth: []
+    parameters:
+      - in: path
+        name: schedule_id
+        type: string
+        required: true
+        description: UUID of the schedule to update
+        example: "550e8400-e29b-41d4-a716-446655440000"
+      - in: body
+        name: body
+        description: Updated schedule configuration
+        required: true
+        schema:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: ["command", "sequence"]
+              example: "sequence"
+              description: Type of task to schedule
+            target_id:
+              type: string
+              example: "2"
+              description: ID of the command or sequence to schedule
+            schedule_type:
+              type: string
+              enum: ["once", "daily", "weekly", "monthly"]
+              example: "weekly"
+              description: Schedule frequency type
+            schedule_data:
+              type: object
+              description: Schedule-specific configuration
+              example: {"day": 1, "time": "09:00:00"}
+    responses:
+      200:
+        description: Schedule updated successfully
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            message:
+              type: string
+              example: "Schedule updated successfully"
+            schedule:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+                name:
+                  type: string
+                  example: "Sequence Schedule - Weekly"
+                type:
+                  type: string
+                  example: "sequence"
+                target_id:
+                  type: string
+                  example: "2"
+                schedule_type:
+                  type: string
+                  example: "weekly"
+                schedule_data:
+                  type: object
+                  example: {"day": 1, "time": "09:00:00"}
+                next_run:
+                  type: string
+                  format: date-time
+                  example: "2025-09-30T09:00:00"
+                status:
+                  type: string
+                  example: "active"
+      400:
+        description: Invalid request data
+      401:
+        description: Authentication required
+      404:
+        description: Schedule not found
+      500:
+        description: Server error
+    """
+    try:
+        from app.services.scheduling_service import SchedulingService
+        
+        # Get the task to verify it belongs to the user
+        task = SchedulingService.get_task(schedule_id)
+        if not task or str(task.created_by) != str(user['id']):
+            return jsonify({'success': False, 'error': 'Schedule not found'}), 404
+        
+        data = request.get_json()
+        
+        # Delete the old task
+        SchedulingService.delete_task(schedule_id)
+        
+        # Create a new task with updated data
+        updated_task = SchedulingService.schedule_task(
+            task_type=data.get('type', task.type),
+            target_id=data.get('target_id', task.target_id),
+            schedule_type=data.get('schedule_type', task.schedule_type),
+            schedule_data=data.get('schedule_data', task.schedule_data),
+            user_id=str(user['id'])
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Schedule updated successfully',
+            'schedule': {
+                'id': updated_task.id,
+                'name': f"{updated_task.type.title()} Schedule - {updated_task.schedule_type.title()}",
+                'type': updated_task.type,
+                'target_id': updated_task.target_id,
+                'schedule_type': updated_task.schedule_type,
+                'schedule_data': updated_task.schedule_data,
+                'next_run': updated_task.next_run.isoformat() if updated_task.next_run else None,
+                'status': updated_task.status
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/schedules/<string:schedule_id>', methods=['DELETE'])
 @login_required()
 def delete_schedule(user, schedule_id):
-    """Delete a schedule"""
+    """
+    Delete a scheduled task
+    ---
+    tags:
+      - Schedules
+    security:
+      - SessionAuth: []
+    parameters:
+      - in: path
+        name: schedule_id
+        type: string
+        required: true
+        description: UUID of the schedule to delete
+        example: "550e8400-e29b-41d4-a716-446655440000"
+    responses:
+      200:
+        description: Schedule deleted successfully
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            message:
+              type: string
+              example: "Schedule deleted successfully"
+      401:
+        description: Authentication required
+      404:
+        description: Schedule not found
+      500:
+        description: Server error
+    """
     try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                DELETE FROM schedules 
-                WHERE id = %s AND created_by = %s
-            """, (schedule_id, user['id']))
-            
-            if cursor.rowcount == 0:
-                return jsonify({'success': False, 'error': 'Schedule not found'}), 404
-            
-            conn.commit()
-            return jsonify({'success': True, 'message': 'Schedule deleted successfully'})
+        from app.services.scheduling_service import SchedulingService
+        
+        # Get the task to verify it belongs to the user
+        task = SchedulingService.get_task(schedule_id)
+        if not task or str(task.created_by) != str(user['id']):
+            return jsonify({'success': False, 'error': 'Schedule not found'}), 404
+        
+        # Delete the task
+        SchedulingService.delete_task(schedule_id)
+        return jsonify({'success': True, 'message': 'Schedule deleted successfully'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

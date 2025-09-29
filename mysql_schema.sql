@@ -114,6 +114,21 @@ CREATE TABLE schedules (
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- Scheduled tasks table - for SchedulingService daemon
+CREATE TABLE scheduled_tasks (
+    id VARCHAR(36) PRIMARY KEY,
+    type ENUM('command', 'sequence') NOT NULL,
+    target_id VARCHAR(255) NOT NULL,
+    schedule_type ENUM('once', 'daily', 'weekly', 'monthly') NOT NULL,
+    schedule_data JSON NOT NULL,
+    next_run DATETIME NOT NULL,
+    last_run DATETIME NULL,
+    status ENUM('pending', 'active', 'paused', 'completed') NOT NULL DEFAULT 'active',
+    created_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Command templates table - parsed command templates from remote files
 CREATE TABLE command_templates (
     id INT AUTO_INCREMENT PRIMARY KEY,

@@ -15,7 +15,7 @@ except ImportError:
     # Fall back to relative import (when importing within the package)
     from ..mysql_db import db
 
-def process_single_signal(signal_elem, override_name, signals, remote_name, parent_mod_freq=None):
+def process_single_signal(signal_elem, override_name, signals, remote_name):
     """Process a single signal element and add it to the signals list"""
     name = signal_elem.find('Name')
     if name is None:
@@ -27,18 +27,7 @@ def process_single_signal(signal_elem, override_name, signals, remote_name, pare
     
     uid_elem = signal_elem.find('UID')
     mod_freq_elem = signal_elem.find('ModulationFreq')
-    
-    # If ModulationFreq not found, try case variations
-    if mod_freq_elem is None:
-        for child in signal_elem:
-            if child.tag.lower() in ['modulationfreq', 'modulation_freq', 'modulationfrequency']:
-                mod_freq_elem = child
-
-                break
-    
     sig_data_elem = signal_elem.find('SigData')
-    
-
     
     # Get additional signal parameters
     no_repeats_elem = signal_elem.find('NoRepeats')
@@ -75,7 +64,7 @@ def process_single_signal(signal_elem, override_name, signals, remote_name, pare
         signal_data = {
             'name': signal_name,
             'uid': uid_elem.text,
-            'modulation_freq': mod_freq_elem.text if mod_freq_elem is not None else (parent_mod_freq or "36000"),
+            'modulation_freq': mod_freq_elem.text if mod_freq_elem is not None else "36000",
             'sig_data': sig_data_elem.text,
             'no_repeats': int(no_repeats_elem.text) if no_repeats_elem is not None and no_repeats_elem.text else 1,
             'intra_sig_pause': float(intra_sig_pause_elem.text) if intra_sig_pause_elem is not None and intra_sig_pause_elem.text else 0.0,
@@ -83,7 +72,7 @@ def process_single_signal(signal_elem, override_name, signals, remote_name, pare
             'toggle_data': toggle_data
         }
         signals.append(signal_data)
-
+        print(f"Added signal '{signal_name}' with {len(lengths)} lengths and {len(toggle_data)} toggle bits")
         return True
     else:
         skip_reason = []
@@ -93,38 +82,35 @@ def process_single_signal(signal_elem, override_name, signals, remote_name, pare
             skip_reason.append("no UID")
         if sig_data_elem is None or not sig_data_elem.text:
             skip_reason.append("no SigData")
-
+        print(f"Skipped signal: {', '.join(skip_reason)}")
         return False
 
 def parse_remotes_xml(xml_path):
     """Parse the remotes XML file and return a list of remote devices with their commands"""
-
     try:
         tree = ET.parse(xml_path)
         root = tree.getroot()
-
+        print(f"Root element: {root.tag}")
+        print(f"Root namespace: {root.nsmap if hasattr(root, 'nsmap') else 'N/A'}")
     except Exception as e:
-
+        print(f"Error parsing XML file: {e}")
         return []
     
     remotes = []
     
     # Debug: Print all child elements
-
+    print(f"Root children: {[child.tag for child in root]}")
     
     # Try different ways to find AVDevice elements
     avdevices_container = root.find('AVDevices')
     if avdevices_container is not None:
-
+        print(f"Found AVDevices container with {len(list(avdevices_container))} children")
         devices = avdevices_container.findall('AVDevice')
-    elif root.tag == 'AVDevice':
-
-        devices = [root]  # Use the root element itself
     else:
-
+        print("AVDevices container not found, searching directly")
         devices = root.findall('.//AVDevice')
     
-
+    print(f"Found {len(devices)} AVDevice elements")
     
     # Loop through all AVDevice elements
     for device in devices:
@@ -135,11 +121,11 @@ def parse_remotes_xml(xml_path):
             
         # Skip if no name found
         if remote_name is None or not remote_name.text:
-
+            print("Skipping device with no name")
             continue
             
         remote_name = remote_name.text
-
+        print(f"Processing device: {remote_name}")
         
         manufacturer = device.find('Manufacturer').text if device.find('Manufacturer') is not None else None
         device_model = device.find('DeviceModelNumber').text if device.find('DeviceModelNumber') is not None else None
@@ -159,13 +145,13 @@ def parse_remotes_xml(xml_path):
         # Look for signals in the Signals container
         signals_container = device.find('Signals')
         if signals_container is not None:
-
+            print(f"Found Signals container with {len(list(signals_container))} IRPacket elements")
             signal_elements = signals_container.findall('IRPacket')
         else:
-
+            print("Signals container not found, searching for IRPacket elements directly")
             signal_elements = device.findall('.//IRPacket')
         
-
+        print(f"Found {len(signal_elements)} IRPacket elements for device {remote_name}")
         
         for signal in signal_elements:
             # Handle regular signals and DoubleSignal containers
@@ -173,36 +159,21 @@ def parse_remotes_xml(xml_path):
             
             if signal_type == 'DoubleSignal':
                 # Handle DoubleSignal type (contains Signal1 and Signal2)
-                # For DoubleSignal, create a single command using Signal1 data as primary
+                # A DoubleSignal should be treated as ONE command, not split into separate entries
                 name = signal.find('Name')
                 if name is not None and name.text:
-                    base_name = name.text
-                    
+                    # Use Signal1 as the primary signal (as per RedRat documentation)
                     signal1 = signal.find('Signal1')
-                    signal2 = signal.find('Signal2')
-                    
-                    # DEBUG: Print DoubleSignal details for command "1"
-                    if base_name == "1":
-
-                        if signal1 is not None:
-                            sig1_mod_freq = signal1.find('ModulationFreq')
-
-                        if signal2 is not None:
-                            sig2_mod_freq = signal2.find('ModulationFreq')
-
-
-                    
-                    # Use Signal1 as the primary signal for the command (most common approach)
                     if signal1 is not None:
-                        process_single_signal(signal1, base_name, signals, remote_name, None)
-
+                        # Process as a single command with the original name (no _Signal1 suffix)
+                        process_single_signal(signal1, name.text, signals, remote_name)
                     else:
-
+                        print(f"Warning: DoubleSignal '{name.text}' has no Signal1")
                 else:
-
+                    print("Skipped DoubleSignal: no name")
             else:
                 # Handle regular ModulatedSignal
-                process_single_signal(signal, None, signals, remote_name, None)
+                process_single_signal(signal, None, signals, remote_name)
         
         remotes.append({
             'name': remote_name,
@@ -235,7 +206,7 @@ def import_remotes_to_db(remotes, user_id=None):
     # Process each remote
     for remote in remotes:
         if not remote['name']:
-
+            print("Skipping remote with no name")
             continue
             
         # Save the remote
@@ -252,7 +223,7 @@ def import_remotes_to_db(remotes, user_id=None):
             
             if result:
                 remote_id = result[0]
-
+                print(f"Remote '{remote['name']}' already exists with ID {remote_id}, updating...")
                 # Update the remote with new data
                 cursor.execute("""
                     UPDATE remotes SET 
@@ -295,10 +266,45 @@ def import_remotes_to_db(remotes, user_id=None):
                 ))
                 remote_id = cursor.lastrowid
                 conn.commit()
-
+                print(f"Created new remote '{remote['name']}' with ID {remote_id}")
                 imported_count += 1
             
-            # Create command templates directly from the signals (no file storage needed)
+            # Save the signals as an IRDB file
+            signals_data = json.dumps({
+                'remote_name': remote['name'],
+                'manufacturer': remote['manufacturer'],
+                'device_type': remote['device_type'],
+                'signals': remote['signals']
+            })
+            
+            # Create a filename based on the remote name
+            filename = f"{remote['name'].replace(' ', '_')}.xml"
+            filepath = f"static/remote_files/{filename}"
+            
+            # Make sure the directory exists
+            os.makedirs("app/static/remote_files", exist_ok=True)
+            
+            # Write the signal data to a file
+            with open(f"app/{filepath}", 'w') as f:
+                f.write(signals_data)
+            
+            # Add the remote file to the database
+            cursor.execute("SELECT id FROM remote_files WHERE filename = %s", (filename,))
+            result = cursor.fetchone()
+            
+            if result:
+                file_id = result[0]
+                print(f"Remote file '{filename}' already exists with ID {file_id}")
+            else:
+                cursor.execute(
+                    "INSERT INTO remote_files (name, filename, filepath, device_type, uploaded_by) VALUES (%s, %s, %s, %s, %s)",
+                    (remote['name'], filename, filepath, remote['device_type'], user_id)
+                )
+                file_id = cursor.lastrowid
+                conn.commit()
+                print(f"Created new remote file '{filename}' with ID {file_id}")
+            
+            # Create command templates from the signals
             for signal in remote['signals']:
                 if not signal['name']:
                     continue
@@ -315,10 +321,9 @@ def import_remotes_to_db(remotes, user_id=None):
                     'toggle_data': signal.get('toggle_data', [])
                 }
                 
-                # Check for existing template by name and remote_id (not file_id)
                 cursor.execute(
-                    "SELECT id FROM command_templates WHERE name = %s AND JSON_EXTRACT(template_data, '$.remote_id') = %s",
-                    (signal['name'], remote_id)
+                    "SELECT id FROM command_templates WHERE name = %s AND file_id = %s",
+                    (signal['name'], file_id)
                 )
                 result = cursor.fetchone()
                 
@@ -328,16 +333,16 @@ def import_remotes_to_db(remotes, user_id=None):
                         "UPDATE command_templates SET template_data = %s WHERE id = %s",
                         (json.dumps(template_data), result[0])
                     )
-
+                    print(f"Updated command template '{signal['name']}' for remote '{remote['name']}'")
                 else:
-                    # Create new template linked to remote_id (use remote_id as file_id for compatibility)
+                    # Create new template
                     cursor.execute(
                         """INSERT INTO command_templates 
                            (file_id, name, device_type, template_data, created_by) 
                            VALUES (%s, %s, %s, %s, %s)""",
-                        (remote_id, signal['name'], remote['device_type'], json.dumps(template_data), user_id)
+                        (file_id, signal['name'], remote['device_type'], json.dumps(template_data), user_id)
                     )
-
+                    print(f"Created command template '{signal['name']}' for remote '{remote['name']}'")
                 
                 conn.commit()
                 
@@ -347,7 +352,7 @@ def import_remotes_from_xml(xml_path, user_id):
     """Import remotes from an XML file"""
     # Parse the XML file
     remotes = parse_remotes_xml(xml_path)
-
+    print(f"Found {len(remotes)} remotes in XML file")
     
     if not remotes:
         return 0

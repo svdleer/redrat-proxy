@@ -3,8 +3,12 @@ FROM python:3.13-slim
 # Install required dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    gcc python3-dev python3-venv libmariadb-dev-compat libmariadb-dev libjpeg-dev zlib1g-dev curl && \
+    gcc python3-dev python3-venv libmariadb-dev-compat libmariadb-dev libjpeg-dev zlib1g-dev curl tzdata && \
     rm -rf /var/lib/apt/lists/*
+
+# Set timezone to Europe/Amsterdam (or use TZ environment variable)
+ENV TZ=Europe/Amsterdam
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 RUN pip install --upgrade pip
 

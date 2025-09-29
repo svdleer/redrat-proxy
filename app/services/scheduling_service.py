@@ -27,7 +27,8 @@ class SchedulingService:
         task.next_run = task._calculate_next_run()
         
         with get_db() as conn:
-            conn.execute("""
+            cursor = conn.cursor()
+            cursor.execute("""
                 INSERT INTO scheduled_tasks
                 (id, type, target_id, schedule_type, schedule_data, next_run, created_by, created_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -109,7 +110,8 @@ class SchedulingService:
                 if task.type == 'command':
                     # For a command, update its status to 'queued'
                     with get_db() as conn:
-                        conn.execute("""
+                        cursor = conn.cursor()
+                        cursor.execute("""
                             UPDATE commands
                             SET status = 'queued'
                             WHERE id = %s
@@ -128,7 +130,8 @@ class SchedulingService:
                     task.update_next_run()
                     
                     with get_db() as conn:
-                        conn.execute("""
+                        cursor = conn.cursor()
+                        cursor.execute("""
                             UPDATE scheduled_tasks
                             SET next_run = %s
                             WHERE id = %s
@@ -137,7 +140,8 @@ class SchedulingService:
                 else:
                     # Delete one-time tasks after execution
                     with get_db() as conn:
-                        conn.execute("""
+                        cursor = conn.cursor()
+                        cursor.execute("""
                             DELETE FROM scheduled_tasks
                             WHERE id = %s
                         """, (task.id,))
@@ -154,7 +158,8 @@ class SchedulingService:
     def delete_task(task_id: str) -> bool:
         """Delete a scheduled task"""
         with get_db() as conn:
-            conn.execute("""
+            cursor = conn.cursor()
+            cursor.execute("""
                 DELETE FROM scheduled_tasks
                 WHERE id = %s
             """, (task_id,))

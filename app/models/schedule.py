@@ -11,7 +11,8 @@ class ScheduledTask:
     SCHEDULE_TYPES = ['once', 'daily', 'weekly', 'monthly']
     
     def __init__(self, id=None, type=None, target_id=None, schedule_type=None, 
-                 schedule_data=None, next_run=None, created_by=None, created_at=None):
+                 schedule_data=None, next_run=None, last_run=None, status=None, 
+                 created_by=None, created_at=None):
         self.id = id or str(uuid.uuid4())
         
         if type not in self.TYPES:
@@ -31,6 +32,8 @@ class ScheduledTask:
         # monthly: {'day': 1-31, 'time': 'HH:MM:SS'}
         self.schedule_data = schedule_data or {}
         self.next_run = next_run or self._calculate_next_run()
+        self.last_run = last_run
+        self.status = status or 'active'
         self.created_by = created_by
         self.created_at = created_at or datetime.now()
     
@@ -50,6 +53,8 @@ class ScheduledTask:
             schedule_type=row['schedule_type'],
             schedule_data=schedule_data,
             next_run=row['next_run'],
+            last_run=row.get('last_run'),
+            status=row.get('status', 'active'),
             created_by=row['created_by'],
             created_at=row['created_at']
         )

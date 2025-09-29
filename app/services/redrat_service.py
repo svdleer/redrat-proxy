@@ -146,7 +146,7 @@ class RedRatService:
                 result['message'] = f"Command '{command_name}' not found for remote {remote_id}"
                 return result
             
-            logger.debug(f"Found template data for {command_name}: {type(template_data)}")
+
             
             # Convert JSON template data to binary IR data and extract IR parameters
             ir_conversion_result = self._convert_template_to_ir_data(template_data)
@@ -283,8 +283,12 @@ class RedRatService:
             try:
                 if ir.connect():
                     device_info = ir.get_device_info()
+                    # Get device model safely
+                    device_model = device_info.get('device_type', 'Unknown')
+                    if hasattr(device_model, 'value'):
+                        device_model = device_model.value
                     result['device_info'] = {
-                        'model': device_info['device_type'],
+                        'model': device_model,
                         'ports': 16,  # Standard for IRNetBox
                         'host': self.host,
                         'port': self.port
@@ -297,7 +301,11 @@ class RedRatService:
                 
                 result['response_time'] = time.time() - start_time
                 result['success'] = True
-                result['message'] = f"Successfully connected to RedRat device (model {ir.irnetbox_model})"
+                # Get device model safely
+                device_model = getattr(ir, 'device_type', 'Unknown')
+                if hasattr(device_model, 'value'):
+                    device_model = device_model.value
+                result['message'] = f"Successfully connected to RedRat device (model {device_model})"
                 
                 logger.info(f"Connection test successful: {result['message']}")
                 
@@ -332,65 +340,51 @@ class RedRatService:
                 signal1_name = f"{command_name}_signal1"
                 signal2_name = f"{command_name}_signal2"
                 
+                # Check for double signals first
                 cursor.execute("""
                     SELECT ct.name, ct.template_data 
                     FROM command_templates ct
-                    WHERE ct.name IN (%s, %s)
-                    AND JSON_EXTRACT(ct.template_data, '$.remote_id') = %s
+                    WHERE ct.name IN (%s, %s) AND ct.file_id = %s
                     ORDER BY ct.name
                 """, (signal1_name, signal2_name, remote_id))
                 
-                signals = cursor.fetchall()
-                if len(signals) == 2:  # Both signal1 and signal2 exist
-                    # Implement alternation logic
+                double_signals = cursor.fetchall()
+                if double_signals:
+                    # Use alternation state to switch between signal1 and signal2
                     alternation_key = (remote_id, command_name)
-                    current_signal = self._alternation_state.get(alternation_key, 'signal2')  # Start with signal2 so first call uses signal1
+                    current_state = self._alternation_state.get(alternation_key, 'signal2')  # Start with signal2 so first call uses signal1
                     
-                    # Alternate between signal1 and signal2
-                    next_signal = 'signal1' if current_signal == 'signal2' else 'signal2'
-                    self._alternation_state[alternation_key] = next_signal
+                    if current_state == 'signal1':
+                        # Switch to signal2
+                        self._alternation_state[alternation_key] = 'signal2'
+                        preferred_signal = signal2_name
+                    else:
+                        # Switch to signal1
+                        self._alternation_state[alternation_key] = 'signal1'
+                        preferred_signal = signal1_name
                     
-                    # Find the template data for the selected signal
-                    selected_template = None
-                    for signal_name, template_data in signals:
-                        if signal_name == f"{command_name}_{next_signal}":
-                            selected_template = template_data
-                            break
+                    # Find the preferred signal in results
+                    for signal_name, signal_data in double_signals:
+                        if signal_name == preferred_signal:
+                            logger.debug(f"Using alternating signal '{preferred_signal}' for command '{command_name}' on remote {remote_id}")
+                            return self._parse_template_data(signal_data)
                     
-                    if selected_template:
-                        logger.info(f"🔄 Alternating to {next_signal} for command '{command_name}' on remote {remote_id}")
-                        return self._parse_template_data(selected_template)
+                    # If preferred signal not found, use the first available double signal
+                    logger.debug(f"Preferred signal '{preferred_signal}' not found, using first available double signal '{double_signals[0][0]}' for command '{command_name}' on remote {remote_id}")
+                    return self._parse_template_data(double_signals[0][1])
                 
-                elif len(signals) == 1:  # Only one signal variant exists
-                    logger.debug(f"Found single signal variant for command '{command_name}' on remote {remote_id}")
-                    return self._parse_template_data(signals[0][1])
-                
-                # Fallback: try without remote_id check (for any remote)
+                # Fallback: Direct lookup using file_id which matches remote_id
                 cursor.execute("""
                     SELECT ct.template_data 
                     FROM command_templates ct
-                    WHERE ct.name = %s
+                    WHERE ct.name = %s AND ct.file_id = %s
                     LIMIT 1
-                """, (command_name,))
+                """, (command_name, remote_id))
                 
                 result = cursor.fetchone()
                 if result:
-                    logger.debug(f"Found fallback template for command '{command_name}' (any remote)")
+                    logger.debug(f"Found exact template for command '{command_name}' on remote {remote_id}")
                     return self._parse_template_data(result[0])
-                
-                # Final fallback: check for double signals without remote_id
-                cursor.execute("""
-                    SELECT ct.name, ct.template_data 
-                    FROM command_templates ct
-                    WHERE ct.name IN (%s, %s)
-                    ORDER BY ct.name
-                    LIMIT 2
-                """, (signal1_name, signal2_name))
-                
-                signals = cursor.fetchall()
-                if signals:
-                    logger.debug(f"Found fallback signal variants for command '{command_name}' (any remote)")
-                    return self._parse_template_data(signals[0][1])
                 
                 logger.warning(f"No template found for command '{command_name}' on remote {remote_id}")
                 cursor.close()
@@ -443,9 +437,13 @@ class RedRatService:
                 'intra_sig_pause': 100  # Default pause in milliseconds
             }
             
-            # Extract IR parameters from template data
+            # Extract IR parameters from template data (handle both root level and IRPacket formats)
+            # NOTE: Each command can have its own frequency - this extracts per-command modulation_freq
             if 'modulation_freq' in template_data:
-                ir_params['modulation_freq'] = int(template_data['modulation_freq'])
+                # Direct format (Humax style) - modulation_freq can be string or int
+                raw_freq = template_data['modulation_freq']
+                ir_params['modulation_freq'] = int(float(raw_freq)) if isinstance(raw_freq, str) else int(raw_freq)
+
             if 'no_repeats' in template_data:
                 ir_params['no_repeats'] = int(template_data['no_repeats'])
             if 'intra_sig_pause' in template_data:
@@ -473,6 +471,30 @@ class RedRatService:
             elif 'IRPacket' in template_data:
                 # IRPacket format from XML
                 ir_packet = template_data['IRPacket']
+                
+                # Extract parameters from IRPacket (XML format uses different key names)
+                if 'ModulationFreq' in ir_packet:
+                    raw_freq = ir_packet['ModulationFreq']
+                    ir_params['modulation_freq'] = int(float(raw_freq))
+                    logger.debug(f"Raw ModulationFreq from XML: '{raw_freq}' (type: {type(raw_freq)}) -> parsed: {ir_params['modulation_freq']}")
+                else:
+                    logger.debug(f"No ModulationFreq found in IRPacket. Available keys: {list(ir_packet.keys())}")
+                    # Check if it's stored under a different name
+                    for key in ir_packet:
+                        if 'freq' in key.lower() or 'modulation' in key.lower():
+                            logger.debug(f"Found frequency-related key '{key}': {ir_packet[key]}")
+                if 'NoRepeats' in ir_packet:
+                    ir_params['no_repeats'] = int(ir_packet['NoRepeats'])
+                if 'IntraSigPause' in ir_packet:
+                    ir_params['intra_sig_pause'] = float(ir_packet['IntraSigPause'])
+                
+                # Extract Lengths array for RedRat3 signals
+                lengths = []
+                if 'Lengths' in ir_packet and isinstance(ir_packet['Lengths'], list):
+                    lengths = [float(x) for x in ir_packet['Lengths']]
+                    logger.debug(f"Extracted {len(lengths)} lengths from XML")
+                ir_params['lengths'] = lengths
+                
                 if 'SigData' in ir_packet:
                     sig_data = ir_packet['SigData']
                     if isinstance(sig_data, str):
@@ -481,11 +503,13 @@ class RedRatService:
                             import base64
                             ir_data = base64.b64decode(sig_data)
                             logger.debug(f"Decoded base64 SigData: {len(ir_data)} bytes")
+                            logger.debug(f"Using ModulationFreq: {ir_params['modulation_freq']}Hz")
                             return {
                                 'ir_data': ir_data,
                                 'modulation_freq': ir_params['modulation_freq'],
                                 'no_repeats': ir_params['no_repeats'],
-                                'intra_sig_pause': ir_params['intra_sig_pause']
+                                'intra_sig_pause': ir_params['intra_sig_pause'],
+                                'lengths': ir_params.get('lengths', [])
                             }
                         except Exception as e:
                             logger.warning(f"Failed to decode base64 SigData, trying hex: {e}")
@@ -504,8 +528,16 @@ class RedRatService:
                         
             elif 'signal_data' in template_data or 'sig_data' in template_data:
                 # Database format - signal_data is binary data encoded as base64 or raw bytes
-                # Also handle sig_data format from JSON files
+                # Also handle sig_data format from JSON files and Humax direct format
                 sig_data = template_data.get('signal_data') or template_data.get('sig_data')
+                
+                # Extract Lengths array for RedRat3 signals if available (Humax format)
+                lengths = []
+                if 'lengths' in template_data and isinstance(template_data['lengths'], list):
+                    lengths = [float(x) for x in template_data['lengths']]
+                    logger.debug(f"Extracted {len(lengths)} lengths from direct format")
+                ir_params['lengths'] = lengths
+                
                 if isinstance(sig_data, str):
                     # Skip empty strings
                     if not sig_data.strip():
@@ -519,11 +551,14 @@ class RedRatService:
                         if len(ir_data) == 0:
                             logger.warning("Base64 decoded to empty data")
                             return None
+                        logger.debug(f"Decoded signal_data: {len(ir_data)} bytes")
+                        logger.debug(f"Using ModulationFreq: {ir_params['modulation_freq']}Hz")
                         return {
                             'ir_data': ir_data,
                             'modulation_freq': ir_params['modulation_freq'],
                             'no_repeats': ir_params['no_repeats'],
-                            'intra_sig_pause': ir_params['intra_sig_pause']
+                            'intra_sig_pause': ir_params['intra_sig_pause'],
+                            'lengths': ir_params.get('lengths', [])
                         }
                     except:
                         # If base64 fails, treat as hex string
@@ -536,7 +571,8 @@ class RedRatService:
                                 'ir_data': ir_data,
                                 'modulation_freq': ir_params['modulation_freq'],
                                 'no_repeats': ir_params['no_repeats'],
-                                'intra_sig_pause': ir_params['intra_sig_pause']
+                                'intra_sig_pause': ir_params['intra_sig_pause'],
+                                'lengths': ir_params.get('lengths', [])
                             }
                         else:
                             logger.warning("No valid hex data found in signal data")
@@ -550,7 +586,8 @@ class RedRatService:
                         'ir_data': sig_data,
                         'modulation_freq': ir_params['modulation_freq'],
                         'no_repeats': ir_params['no_repeats'],
-                        'intra_sig_pause': ir_params['intra_sig_pause']
+                        'intra_sig_pause': ir_params['intra_sig_pause'],
+                        'lengths': ir_params.get('lengths', [])
                     }
                 elif isinstance(sig_data, list):
                     # List of bytes
@@ -562,7 +599,8 @@ class RedRatService:
                         'ir_data': ir_data,
                         'modulation_freq': ir_params['modulation_freq'],
                         'no_repeats': ir_params['no_repeats'],
-                        'intra_sig_pause': ir_params['intra_sig_pause']
+                        'intra_sig_pause': ir_params['intra_sig_pause'],
+                        'lengths': ir_params.get('lengths', [])
                     }
             
             logger.warning(f"No valid signal data found in template. Available keys: {list(template_data.keys())}")
@@ -638,12 +676,16 @@ class RedRatService:
                     else:
                         power_level = PowerLevel.OFF
                     
-                    # Create signal object
+                    # Extract lengths from IR data if available
+                    lengths = ir_params.get('lengths', [])
+                    
+                    # Create signal object using the actual command name from template
+                    command_name = ir_params.get('command_name', f"Command_{ir_port}")
                     signal = IRSignal(
-                        name=f"Command_{ir_port}",
+                        name=command_name,
                         uid=f"cmd_{ir_port}_{int(time.time())}",
                         modulation_freq=modulation_freq or 38000,  # Default to 38kHz if not specified
-                        lengths=[],  # Empty for raw data
+                        lengths=lengths,  # Use lengths from XML data
                         sig_data=ir_data,
                         no_repeats=no_repeats,
                         intra_sig_pause=intra_sig_pause

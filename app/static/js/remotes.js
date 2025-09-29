@@ -39,9 +39,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await apiCall('/api/remotes', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                        'Content-Type': 'application/json'
                     },
+                    credentials: 'include', // Include cookies for session auth
                     body: JSON.stringify(formData)
                 });
                 
@@ -73,9 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const response = await apiCall('/api/remotes/import-irnetbox', {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    },
+                    credentials: 'include', // Include cookies for session auth
                     body: formData
                 });
                 
@@ -159,9 +157,7 @@ async function deleteRemote(id) {
     try {
         const response = await apiCall(`/api/remotes/${id}`, {
             method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
+            credentials: 'include' // Include cookies for session auth
         });
         
         if (!response) return; // User was redirected to login

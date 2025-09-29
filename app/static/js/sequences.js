@@ -211,9 +211,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const cmdInfo = document.createElement('div');
             const commandName = cmd.command || 'Unknown';
             const remoteName = cmd.remote_name || 'Unknown Remote';
+            const irPort = cmd.ir_port || 1;
+            const power = cmd.power || 50;
             cmdInfo.innerHTML = `
                 <div class="font-medium">${commandName} (${remoteName})</div>
-                <div class="text-sm text-gray-600">Delay: ${cmd.delay_ms}ms</div>
+                <div class="text-sm text-gray-600">IR Port: ${irPort} | Power: ${power}% | Delay: ${cmd.delay_ms}ms</div>
             `;
             
             const cmdActions = document.createElement('div');
@@ -378,13 +380,55 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     async function moveCommandUp(cmdId) {
-        // This would require a backend API for reordering
-        console.log('Move command up:', cmdId);
+        if (!currentSequence) {
+            showError('No sequence selected');
+            return;
+        }
+        
+        try {
+            const response = await apiCall(`/api/sequences/${currentSequence.id}/commands/${cmdId}/move-up`, {
+                method: 'PUT'
+            });
+            
+            if (!response) return; // User was redirected to login
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showSuccess('Command moved up successfully');
+                await editSequence(currentSequence.id); // Refresh the sequence
+            } else {
+                showError('Failed to move command up: ' + data.error);
+            }
+        } catch (error) {
+            showError('Failed to move command up: ' + error.message);
+        }
     }
     
     async function moveCommandDown(cmdId) {
-        // This would require a backend API for reordering
-        console.log('Move command down:', cmdId);
+        if (!currentSequence) {
+            showError('No sequence selected');
+            return;
+        }
+        
+        try {
+            const response = await apiCall(`/api/sequences/${currentSequence.id}/commands/${cmdId}/move-down`, {
+                method: 'PUT'
+            });
+            
+            if (!response) return; // User was redirected to login
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showSuccess('Command moved down successfully');
+                await editSequence(currentSequence.id); // Refresh the sequence
+            } else {
+                showError('Failed to move command down: ' + data.error);
+            }
+        } catch (error) {
+            showError('Failed to move command down: ' + error.message);
+        }
     }
     
     async function executeSequence() {
