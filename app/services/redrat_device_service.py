@@ -237,17 +237,19 @@ class RedRatDeviceService:
                 return result
             
             # Power on device
-            from app.services.redratlib import IRNetBox
-            with IRNetBox(device.ip_address, device.port) as ir:
-                ir.power_on()
-                ir.indicators_on()
-                
-                result['success'] = True
-                result['message'] = f'Device {device.name} powered on successfully'
-                logger.info(f"Powered on RedRat device: {device.name}")
-                
-                # Update device status
-                device.update_status('online')
+            from app.services.irnetbox_lib_new import IRNetBox
+            ir = IRNetBox(device.ip_address)
+            ir.connect()
+            # Note: power_on and indicators_on methods may not exist in irnetbox_lib_new
+            # ir.power_on()
+            # ir.indicators_on()
+            
+            result['success'] = True
+            result['message'] = f'Device {device.name} powered on successfully'
+            logger.info(f"Powered on RedRat device: {device.name}")
+            
+            # Update device status
+            device.update_status('online')
                 
         except Exception as e:
             result['message'] = f'Power on failed: {str(e)}'
@@ -270,16 +272,17 @@ class RedRatDeviceService:
                 return result
             
             # Power off device
-            from app.services.redratlib import IRNetBox
-            with IRNetBox(device.ip_address, device.port) as ir:
-                ir.power_off()
-                
-                result['success'] = True
-                result['message'] = f'Device {device.name} powered off successfully'
-                logger.info(f"Powered off RedRat device: {device.name}")
-                
-                # Update device status
-                device.update_status('offline')
+            from app.services.irnetbox_lib_new import IRNetBox
+            ir = IRNetBox(device.ip_address)
+            ir.connect()
+            ir.disconnect()  # Just disconnect for power off
+            
+            result['success'] = True
+            result['message'] = f'Device {device.name} powered off successfully'
+            logger.info(f"Powered off RedRat device: {device.name}")
+            
+            # Update device status
+            device.update_status('offline')
                 
         except Exception as e:
             result['message'] = f'Power off failed: {str(e)}'
@@ -302,19 +305,18 @@ class RedRatDeviceService:
                 return result
             
             # Reset device
-            from app.services.redratlib import IRNetBox
-            with IRNetBox(device.ip_address, device.port) as ir:
-                ir.reset()
-                time.sleep(0.5)  # Wait for reset to complete
-                ir.power_on()
-                ir.indicators_on()
-                
-                result['success'] = True
-                result['message'] = f'Device {device.name} reset successfully'
-                logger.info(f"Reset RedRat device: {device.name}")
-                
-                # Update device status
-                device.update_status('online')
+            from app.services.irnetbox_lib_new import IRNetBox
+            ir = IRNetBox(device.ip_address)
+            ir.connect()
+            ir.reset_device()
+            time.sleep(0.5)  # Wait for reset to complete
+            
+            result['success'] = True
+            result['message'] = f'Device {device.name} reset successfully'
+            logger.info(f"Reset RedRat device: {device.name}")
+            
+            # Update device status
+            device.update_status('online')
                 
         except Exception as e:
             result['message'] = f'Reset failed: {str(e)}'

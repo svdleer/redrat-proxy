@@ -37,21 +37,48 @@ function closeAddDeviceModal() {
 }
 
 function openEditDeviceModal() {
-    document.getElementById('editDeviceModal').classList.remove('hidden');
+    console.log('openEditDeviceModal called');
+    const modal = document.getElementById('editDeviceModal');
+    if (modal) {
+        console.log('Edit modal found, showing...');
+        modal.classList.remove('hidden');
+        modal.style.display = 'flex';
+    } else {
+        console.error('Edit modal not found!');
+    }
 }
 
 function closeEditDeviceModal() {
-    document.getElementById('editDeviceModal').classList.add('hidden');
+    const modal = document.getElementById('editDeviceModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+    }
     // Clear port descriptions
-    document.getElementById('editPortDescriptionsContainer').innerHTML = '';
+    const container = document.getElementById('editPortDescriptionsContainer');
+    if (container) {
+        container.innerHTML = '';
+    }
 }
 
 function openDeviceControlModal() {
-    document.getElementById('deviceControlModal').classList.remove('hidden');
+    console.log('openDeviceControlModal called');
+    const modal = document.getElementById('deviceControlModal');
+    if (modal) {
+        console.log('Control modal found, showing...');
+        modal.classList.remove('hidden');
+        modal.style.display = 'flex';
+    } else {
+        console.error('Control modal not found!');
+    }
 }
 
 function closeDeviceControlModal() {
-    document.getElementById('deviceControlModal').classList.add('hidden');
+    const modal = document.getElementById('deviceControlModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+    }
     const controlResult = document.getElementById('controlResult');
     if (controlResult) {
         controlResult.innerHTML = '';
@@ -512,8 +539,13 @@ function saveDevice() {
 }
 
 function editDevice(deviceId) {
+    console.log('editDevice called with deviceId:', deviceId);
     const device = devices.find(d => d.id === deviceId);
-    if (!device) return;
+    if (!device) {
+        console.error('Device not found:', deviceId);
+        return;
+    }
+    console.log('Device found:', device);
     
     document.getElementById('editDeviceId').value = device.id;
     document.getElementById('editDeviceName').value = device.name;
@@ -548,7 +580,9 @@ function updateDevice() {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
         },
+        credentials: 'same-origin',
         body: JSON.stringify(formData)
     })
     .then(response => response.json())
@@ -577,7 +611,11 @@ function deleteDevice(deviceId) {
     }
     
     fetch(`/api/redrat/devices/${deviceId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin'
     })
     .then(response => response.json())
     .then(data => {
@@ -596,8 +634,13 @@ function deleteDevice(deviceId) {
 }
 
 function showDeviceControl(deviceId) {
+    console.log('showDeviceControl called with deviceId:', deviceId);
     const device = devices.find(d => d.id === deviceId);
-    if (!device) return;
+    if (!device) {
+        console.error('Device not found:', deviceId);
+        return;
+    }
+    console.log('Device found:', device);
     
     currentDeviceId = deviceId;
     const netboxType = device.netbox_type_name || getNetBoxTypeName(device.netbox_type) || 'Unknown Type';
@@ -624,8 +667,13 @@ function showDeviceControl(deviceId) {
 }
 
 function controlDevice(action, deviceId = null) {
+    console.log('controlDevice called with action:', action, 'deviceId:', deviceId);
     const targetDeviceId = deviceId || currentDeviceId;
-    if (!targetDeviceId) return;
+    if (!targetDeviceId) {
+        console.error('No target device ID');
+        return;
+    }
+    console.log('Target device ID:', targetDeviceId);
     
     const device = devices.find(d => d.id === targetDeviceId);
     if (!device) return;
@@ -661,7 +709,13 @@ function controlDevice(action, deviceId = null) {
         `;
     }
     
-    fetch(url, { method })
+    fetch(url, { 
+        method,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin'
+    })
         .then(response => response.json())
         .then(data => {
             const alertClass = data.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800';

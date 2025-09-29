@@ -65,7 +65,7 @@ def process_single_signal(signal_elem, override_name, signals, remote_name):
             'name': signal_name,
             'uid': uid_elem.text,
             'modulation_freq': mod_freq_elem.text if mod_freq_elem is not None else "36000",
-            'sig_data': sig_data_elem.text,
+            'SigData': sig_data_elem.text,  # Store as SigData (hex format) for RedRat service compatibility
             'no_repeats': int(no_repeats_elem.text) if no_repeats_elem is not None and no_repeats_elem.text else 1,
             'intra_sig_pause': float(intra_sig_pause_elem.text) if intra_sig_pause_elem is not None and intra_sig_pause_elem.text else 0.0,
             'lengths': lengths,
@@ -312,7 +312,7 @@ def import_remotes_to_db(remotes, user_id=None):
                 template_data = {
                     'remote_id': remote_id,
                     'command': signal['name'],
-                    'signal_data': signal['sig_data'],
+                    'SigData': signal['SigData'],
                     'uid': signal['uid'],
                     'modulation_freq': signal['modulation_freq'],
                     'no_repeats': signal.get('no_repeats', 1),

@@ -32,6 +32,17 @@ app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # 2MB
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 print("✅ Flask app configured successfully")
 
+# Debug middleware to log all import requests
+@app.before_request
+def log_import_requests():
+    if request.path.startswith('/api/remotes/import'):
+        print(f"=== REQUEST DEBUG ===", flush=True)
+        print(f"Method: {request.method}", flush=True)
+        print(f"Path: {request.path}", flush=True)
+        print(f"Files: {list(request.files.keys())}", flush=True)
+        print(f"Form: {dict(request.form)}", flush=True)
+        print("=====================", flush=True)
+
 # Initialize Swagger documentation
 try:
     from flasgger import Swagger
@@ -436,41 +447,62 @@ def import_irnetbox(user):
     """Import remotes from IRNetBox txt file"""
     import tempfile
     
-    if 'txt_file' not in request.files:
-        return jsonify({"error": "No IRNetBox file uploaded"}), 400
-        
-    txt_file = request.files['txt_file']
+    print("=== XML IMPORT REQUEST RECEIVED ===", flush=True)
+    print(f"Request files: {list(request.files.keys())}", flush=True)
+    print(f"User: {user}", flush=True)
     
-    if not txt_file or txt_file.filename == '':
+    app.logger.info("=== XML IMPORT REQUEST RECEIVED ===")
+    app.logger.info(f"Request files: {list(request.files.keys())}")
+    app.logger.info(f"User: {user}")
+    
+    if 'xml_file' not in request.files:
+        return jsonify({"error": "No IRNetBox XML file uploaded"}), 400
+        
+    xml_file = request.files['xml_file']
+    
+    if not xml_file or xml_file.filename == '':
         return jsonify({"error": "No file selected"}), 400
     
-    if not txt_file.filename.endswith('.txt'):
-        return jsonify({"error": "File must be a txt file"}), 400
+    if not xml_file.filename.lower().endswith('.xml'):
+        return jsonify({"error": "File must be an XML file"}), 400
     
     # Save the file temporarily
-    temp_path = os.path.join(tempfile.gettempdir(), "irnetbox_import.txt")
-    txt_file.save(temp_path)
+    temp_path = os.path.join(tempfile.gettempdir(), "irnetbox_import.xml")
+    xml_file.save(temp_path)
     
     # Debug: Check the uploaded file
     app.logger.info(f"Saved uploaded file to: {temp_path}")
     try:
+        # Check file size
+        file_size = os.path.getsize(temp_path)
+        app.logger.info(f"Uploaded file size: {file_size} bytes")
+        
         with open(temp_path, 'r', encoding='utf-8') as f:
             first_line = f.readline()
             app.logger.info(f"First line of uploaded file: {repr(first_line)}")
     except Exception as e:
         app.logger.error(f"Error reading uploaded file: {e}")
+        return jsonify({"error": "Failed to read uploaded file", "message": str(e)}), 500
     
     try:
-        # Read the file content and use the remote service to import IRNetBox
-        with open(temp_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+        # Use the remote service to import XML
+        from app.services.remote_service import import_remotes_from_xml
         
-        from app.services.remote_service import import_remotes_from_irnetbox
+        app.logger.info(f"Starting XML import for user {user['id']}")
+        imported_count = import_remotes_from_xml(temp_path, user['id'])
+        app.logger.info(f"XML import completed: {imported_count} remotes imported")
         
-        imported_count = import_remotes_from_irnetbox(content, user['id'])
-        return jsonify({"message": "Import successful", "imported": imported_count}), 200
+        # Get signal count for better user feedback
+        from app.services.remote_service import parse_remotes_xml
+        remotes = parse_remotes_xml(temp_path)
+        signal_count = sum(len(remote.get('signals', [])) for remote in remotes)
+        
+        message = f"Import successful: {imported_count} remote(s) imported with {signal_count} signal(s)"
+        return jsonify({"message": message, "imported": imported_count, "signals": signal_count}), 200
     except Exception as e:
         app.logger.error(f"Error importing IRNetBox file: {str(e)}")
+        import traceback
+        app.logger.error(f"Full traceback: {traceback.format_exc()}")
         return jsonify({"error": "Error importing IRNetBox file", "message": str(e)}), 500
     finally:
         # Clean up the temporary file
@@ -1989,9 +2021,10 @@ def execute_remote_command(user, remote_id, command_name):
 def get_netbox_types(user):
     """Get all NetBox types with their friendly names"""
     try:
-        from app.services.redratlib import NetBoxTypes
+        from app.services.irnetbox_lib_new import IRNetBoxType
         
-        netbox_types = NetBoxTypes.get_all_types()
+        # Map IRNetBoxType enum to old NetBoxTypes format
+        netbox_types = [{'value': t.value, 'name': t.value} for t in IRNetBoxType]
         
         return jsonify({
             'success': True,
@@ -2008,10 +2041,26 @@ def get_netbox_types(user):
 def translate_netbox_type(netbox_type_value):
     """Translate NetBox type value to friendly name"""
     try:
-        from app.services.redratlib import NetBoxTypes
-        return NetBoxTypes.get_name(netbox_type_value)
+        # Handle both numeric and string inputs
+        if isinstance(netbox_type_value, int):
+            # Map numeric values to device names
+            numeric_map = {
+                1: "IRNetBox MK-I",
+                2: "IRNetBox MK-II", 
+                3: "IRNetBox MK-III",
+                4: "IRNetBox MK-IV",
+                0: "IRNetBox (Unknown)"
+            }
+            return numeric_map.get(netbox_type_value, f"IRNetBox (Unknown Model {netbox_type_value})")
+        else:
+            # Handle string inputs like 'MK-IV'
+            from app.services.irnetbox_lib_new import IRNetBoxType
+            for t in IRNetBoxType:
+                if t.value == netbox_type_value:
+                    return f"IRNetBox {t.value}"
+            return f"IRNetBox {netbox_type_value}"
     except Exception:
-        return f"Unknown Type ({netbox_type_value})"
+        return f"IRNetBox (Unknown Type {netbox_type_value})"
 
 # RedRat Devices API Endpoints
 @app.route('/api/redrat/devices', methods=['GET'])

@@ -11,14 +11,14 @@
 
     <!-- IRNetBox File Upload -->
     <div class="bg-white rounded-lg shadow p-6 mb-8">
-        <h2 class="text-xl font-semibold mb-4">Upload IRNetBox Remote File</h2>
-        <p class="text-sm text-gray-600 mb-4">Upload IRNetBox format .txt files containing remote control IR signal data</p>
+        <h2 class="text-xl font-semibold mb-4">Upload Remote Control File</h2>
+        <p class="text-sm text-gray-600 mb-4">Upload XML files containing remote control IR signal data (IRNetBox XML format)</p>
         <form id="irnetboxUploadForm" enctype="multipart/form-data">
             <div class="flex items-center space-x-4">
-                <input type="file" name="txt_file" accept=".txt" required
+                <input type="file" name="xml_file" accept=".xml" required
                     class="file-input">
                 <button type="submit" class="btn-secondary">
-                    <i class="fas fa-upload mr-2"></i> Upload IRNetBox File
+                    <i class="fas fa-upload mr-2"></i> Upload XML File
                 </button>
             </div>
         </form>
