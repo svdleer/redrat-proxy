@@ -2501,6 +2501,37 @@ def translate_netbox_type(netbox_type_value):
     except Exception:
         return f"IRNetBox (Unknown Type {netbox_type_value})"
 
+def device_model_to_int(device_model_string):
+    """Convert device model string to integer for database storage"""
+    if device_model_string is None:
+        return None
+    
+    # Handle already numeric values
+    if isinstance(device_model_string, int):
+        return device_model_string
+    
+    # Map string device models to integers
+    string_to_int_map = {
+        'MK-I': 1,
+        'MK-II': 2,
+        'MK-III': 3,
+        'MK-IV': 4,
+        'Unknown': 0
+    }
+    
+    # Try exact match first
+    if device_model_string in string_to_int_map:
+        return string_to_int_map[device_model_string]
+    
+    # Try partial matches
+    device_upper = device_model_string.upper()
+    for model_string, model_int in string_to_int_map.items():
+        if model_string.upper() in device_upper:
+            return model_int
+    
+    # Default to 0 (Unknown) if no match found
+    return 0
+
 # RedRat Devices API Endpoints
 @app.route('/api/redrat/devices', methods=['GET'])
 @login_required(admin_only=True)

@@ -199,8 +199,13 @@ class RedRatDeviceService:
             
             # Update device status in database
             if connection_result['success']:
-                device_model = connection_result['device_info'].get('model')
+                device_model_string = connection_result['device_info'].get('model')
                 device_ports = connection_result['device_info'].get('ports')
+                
+                # Convert string device model to integer for database storage
+                from app.app import device_model_to_int
+                device_model = device_model_to_int(device_model_string)
+                
                 device.update_status('online', device_model, device_ports)
                 
                 result['success'] = True
@@ -387,11 +392,19 @@ class RedRatDeviceService:
                         
                         # Update device info if available
                         if connection_result['device_info']:
-                            device_status['device_model'] = connection_result['device_info'].get('model')
+                            device_model_string = connection_result['device_info'].get('model')
+                            device_status['device_model'] = device_model_string
                             device_status['device_ports'] = connection_result['device_info'].get('ports')
+                            
+                            # Convert string device model to integer for database storage
+                            from app.app import device_model_to_int
+                            device_model_int = device_model_to_int(device_model_string)
+                        else:
+                            device_model_int = None
+                            device_status['device_ports'] = None
                         
                         # Update database status
-                        device.update_status('online', device_status['device_model'], device_status['device_ports'])
+                        device.update_status('online', device_model_int, device_status['device_ports'])
                         
                     else:
                         device_status['status'] = 'offline'
