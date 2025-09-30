@@ -1,0 +1,44 @@
+# Python virtual environment
+venv/
+ENV/
+env/
+.venv/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Local development settings
+.env
+*.log
+logs/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+data/
+
+# Production logs and backups
+logs/
+backups/
+
+# Temporary files
+*.tmp
+*.temp

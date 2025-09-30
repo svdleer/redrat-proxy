@@ -1,0 +1,527 @@
+{% extends "base.html" %}
+
+{% block title %}API Keys - RedRat Proxy{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-6 py-8">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">API Key Management</h1>
+        <button onclick="showCreateModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200">
+            <i class="fas fa-plus mr-2"></i>Create New API Key
+        </button>
+    </div>
+
+
+
+    <!-- API Keys Table -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Your API Keys</h2>
+        </div>
+        <div class="p-6">
+            <!-- Loading State -->
+            <div id="loadingState" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <p class="mt-2 text-gray-600">Loading API keys...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="text-center py-12 hidden">
+                <i class="fas fa-key text-gray-400 text-5xl mb-4"></i>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">No API Keys Found</h3>
+                <p class="text-gray-600 mb-4">You haven't created any API keys yet. Create your first key to get started.</p>
+                <button onclick="showCreateModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                    <i class="fas fa-plus mr-2"></i>Create Your First API Key
+                </button>
+            </div>
+
+            <!-- API Keys Table -->
+            <table id="keysTable" class="min-w-full divide-y divide-gray-200 hidden">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name & Created</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expires</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Used</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="keysTableBody" class="bg-white divide-y divide-gray-200">
+                    <!-- API keys will be populated here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Usage Instructions -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-blue-900 mb-3">
+            <i class="fas fa-info-circle mr-2"></i>API Key Usage
+        </h3>
+        <p class="text-blue-800 mb-3">Use your API keys to authenticate requests to the RedRat Proxy API endpoints:</p>
+        <ul class="text-blue-800 mb-4 list-disc list-inside space-y-1">
+            <li>Include the API key in the <code class="bg-blue-100 px-2 py-1 rounded text-sm">Authorization</code> header: <code class="bg-blue-100 px-2 py-1 rounded text-sm">Authorization: Bearer YOUR_API_KEY</code></li>
+            <li>Or include it as a query parameter: <code class="bg-blue-100 px-2 py-1 rounded text-sm">?api_key=YOUR_API_KEY</code></li>
+        </ul>
+        <p class="text-blue-900 font-semibold">⚠️ Important: Keep your API keys secure and don't share them. If you suspect a key has been compromised, delete it immediately and create a new one.</p>
+    </div>
+</div>
+
+<!-- Create API Key Modal -->
+<div id="createKeyModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Create New API Key</h3>
+        </div>
+        <div class="p-6">
+            <form id="createKeyForm">
+                <div class="mb-4">
+                    <label for="keyName" class="block text-sm font-medium text-gray-700 mb-2">Key Name</label>
+                    <input type="text" id="keyName" name="name" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                           placeholder="e.g., 'Production Server', 'Development Testing'">
+                    <p class="mt-1 text-sm text-gray-500">Give your API key a descriptive name to help you identify it later.</p>
+                </div>
+                <div class="mb-4">
+                    <label for="keyExpiry" class="block text-sm font-medium text-gray-700 mb-2">Expiry (Days)</label>
+                    <input type="number" id="keyExpiry" name="expires_days" value="365" min="1" max="3650"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <p class="mt-1 text-sm text-gray-500">How many days until this key expires (default: 365 days).</p>
+                </div>
+            </form>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+            <button onclick="hideCreateModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition duration-200">
+                Cancel
+            </button>
+            <button onclick="createApiKey()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200">
+                Create API Key
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Show API Key Modal -->
+<div id="showKeyModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">New API Key Created</h3>
+        </div>
+        <div class="p-6">
+            <div class="bg-amber-50 border border-amber-200 rounded-md p-4 mb-4">
+                <p class="text-amber-800 font-semibold">⚠️ Important: This is the only time you'll see this API key. Copy it and store it securely.</p>
+            </div>
+            <div class="mb-4">
+                <label for="newApiKey" class="block text-sm font-medium text-gray-700 mb-2">Your New API Key</label>
+                <div class="flex">
+                    <input type="text" id="newApiKey" readonly
+                           class="flex-1 px-3 py-2 border border-gray-300 rounded-l-md bg-gray-50 font-mono text-sm">
+                    <button onclick="copyApiKey()" 
+                            class="px-4 py-2 bg-gray-600 text-white rounded-r-md hover:bg-gray-700 transition duration-200">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
+            <button onclick="hideShowModal()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200">
+                I've Copied It
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// API Keys Management
+(function() {
+    function loadAndShowKeys() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/keys', true);
+        xhr.withCredentials = true;
+        
+        xhr.onload = function() {
+            var loadingEl = document.getElementById('loadingState');
+            var tableEl = document.getElementById('keysTable');
+            var emptyEl = document.getElementById('emptyState');
+            var tbodyEl = document.getElementById('keysTableBody');
+            
+            if (loadingEl) loadingEl.style.display = 'none';
+            
+            if (xhr.status === 200) {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    if (data.success && data.keys && data.keys.length > 0) {
+                        // Show table
+                        if (tableEl) tableEl.style.display = 'table';
+                        if (emptyEl) emptyEl.style.display = 'none';
+                        
+                        // Build table rows
+                        var html = '';
+                        for (var i = 0; i < data.keys.length; i++) {
+                            var key = data.keys[i];
+                            var isActive = key.is_active ? 'Active' : 'Inactive';
+                            var statusClass = key.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                            var expires = key.expires_at ? new Date(key.expires_at).toLocaleDateString() : 'Never expires';
+                            var created = new Date(key.created_at).toLocaleDateString();
+                            
+                            html += '<tr>' +
+                                '<td class="px-6 py-4">' +
+                                '<div class="text-sm font-medium text-gray-900">' + key.name + '</div>' +
+                                '<div class="text-sm text-gray-500">Created: ' + created + '</div>' +
+                                '</td>' +
+                                '<td class="px-6 py-4">' +
+                                '<span class="px-2 py-1 text-xs font-semibold rounded-full ' + statusClass + '">' + isActive + '</span>' +
+                                '</td>' +
+                                '<td class="px-6 py-4 text-sm">' + expires + '</td>' +
+                                '<td class="px-6 py-4 text-sm">' + (key.last_used_at ? new Date(key.last_used_at).toLocaleDateString() : 'Never') + '</td>' +
+                                '<td class="px-6 py-4 text-right">' +
+                                '<button onclick="deleteKey(' + key.id + ',\'' + key.name + '\')" class="text-red-600 hover:text-red-900 transition duration-200">' +
+                                '<i class="fas fa-trash mr-1"></i>Delete' +
+                                '</button>' +
+                                '</td>' +
+                                '</tr>';
+                        }
+                        if (tbodyEl) tbodyEl.innerHTML = html;
+                    } else {
+                        // Show empty state
+                        if (emptyEl) emptyEl.style.display = 'block';
+                        if (tableEl) tableEl.style.display = 'none';
+                    }
+                } catch (e) {
+                    if (emptyEl) emptyEl.style.display = 'block';
+                    if (tableEl) tableEl.style.display = 'none';
+                }
+            } else {
+                if (emptyEl) emptyEl.style.display = 'block';
+                if (tableEl) tableEl.style.display = 'none';
+            }
+        };
+        
+        xhr.onerror = function() {
+            var loadingEl = document.getElementById('loadingState');
+            if (loadingEl) loadingEl.style.display = 'none';
+        };
+        
+        xhr.send();
+    }
+    
+    // Load keys when page is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadAndShowKeys);
+    } else {
+        loadAndShowKeys();
+    }
+})();
+
+// Delete API key function
+function deleteKey(id, name) {
+    if (confirm('Are you sure you want to delete the API key "' + name + '"? This action cannot be undone.')) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('DELETE', '/api/keys/' + id, true);
+        xhr.withCredentials = true;
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                location.reload();
+            } else {
+                alert('Failed to delete API key. Please try again.');
+            }
+        };
+        xhr.send();
+    }
+}
+
+// Modal management functions
+function showCreateModal() {
+    document.getElementById('createKeyModal').classList.remove('hidden');
+    document.getElementById('createKeyModal').classList.add('flex');
+}
+
+function hideCreateModal() {
+    document.getElementById('createKeyModal').classList.add('hidden');
+    document.getElementById('createKeyModal').classList.remove('flex');
+}
+
+function showShowModal() {
+    document.getElementById('showKeyModal').classList.remove('hidden');
+    document.getElementById('showKeyModal').classList.add('flex');
+}
+
+function hideShowModal() {
+    document.getElementById('showKeyModal').classList.add('hidden');
+    document.getElementById('showKeyModal').classList.remove('flex');
+}
+
+// Create API key function
+function createApiKey() {
+    var name = document.getElementById('keyName').value.trim();
+    var expiresDays = parseInt(document.getElementById('keyExpiry').value);
+
+    if (!name) {
+        alert('Please enter a name for the API key.');
+        return;
+    }
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/keys', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.withCredentials = true;
+    
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            try {
+                var result = JSON.parse(xhr.responseText);
+                hideCreateModal();
+                document.getElementById('newApiKey').value = result.key;
+                showShowModal();
+                document.getElementById('createKeyForm').reset();
+                document.getElementById('keyExpiry').value = '365';
+            } catch (e) {
+                alert('Failed to create API key. Please try again.');
+            }
+        } else {
+            alert('Failed to create API key. Please try again.');
+        }
+    };
+    
+    xhr.send(JSON.stringify({
+        name: name,
+        expires_days: expiresDays
+    }));
+}
+
+// Copy API key to clipboard
+function copyApiKey() {
+    var input = document.getElementById('newApiKey');
+    input.select();
+    document.execCommand('copy');
+    alert('API key copied to clipboard!');
+}
+
+// Function to show empty state
+function showEmptyState() {
+    console.log('Showing empty state');
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('keysTable').style.display = 'none';
+}
+
+// Function to display API keys in the table
+function displayApiKeys() {
+    console.log('displayApiKeys called with', apiKeys.length, 'keys');
+    if (apiKeys.length === 0) {
+        console.log('Showing empty state');
+        document.getElementById('emptyState').style.display = 'block';
+        document.getElementById('keysTable').style.display = 'none';
+        return;
+    }
+
+    const tbody = document.getElementById('keysTableBody');
+    tbody.innerHTML = '';
+
+        apiKeys.forEach(key => {
+        const row = document.createElement('tr');
+        // Handle expires_at being null (never expires) or a date
+        const expiresAt = key.expires_at ? new Date(key.expires_at) : null;
+        const isActive = key.is_active && (expiresAt === null || expiresAt > new Date());
+        
+        row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900">${escapeHtml(key.name)}</div>
+                <div class="text-sm text-gray-500">Created: ${formatDate(key.created_at)}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                    ${isActive ? 'Active' : 'Inactive'}
+                </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                ${key.expires_at ? formatDate(key.expires_at) : 'Never expires'}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                ${key.last_used_at ? formatDate(key.last_used_at) : 'Never'}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <button onclick="deleteApiKey(${key.id}, '${escapeHtml(key.name)}')" 
+                        class="text-red-600 hover:text-red-900 transition duration-200">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });    document.getElementById('keysTable').style.display = 'table';
+    document.getElementById('emptyState').style.display = 'none';
+    console.log('Table displayed with', apiKeys.length, 'rows');
+}
+
+// Function to create a new API key
+function createApiKey() {
+    const name = document.getElementById('keyName').value.trim();
+    const expiresDays = parseInt(document.getElementById('keyExpiry').value);
+
+    if (!name) {
+        showAlert('Please enter a name for the API key.', 'warning');
+        return;
+    }
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/keys', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.withCredentials = true;
+    
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
+                try {
+                    const result = JSON.parse(xhr.responseText);
+                    
+                    // Hide create modal and show the new key
+                    hideCreateModal();
+                    document.getElementById('newApiKey').value = result.key;
+                    showShowModal();
+                    
+                    // Reload the keys list
+                    loadApiKeys();
+                    
+                    // Clear the form
+                    document.getElementById('createKeyForm').reset();
+                    document.getElementById('keyExpiry').value = '365';
+                    
+                } catch (error) {
+                    console.error('Error parsing create response:', error);
+                    showAlert('Failed to parse response', 'danger');
+                }
+            } else {
+                console.error('Error creating API key:', xhr.status, xhr.statusText);
+                showAlert('Failed to create API key: HTTP ' + xhr.status, 'danger');
+            }
+        }
+    };
+    
+    xhr.onerror = function() {
+        console.error('Network error creating API key');
+        showAlert('Network error creating API key', 'danger');
+    };
+    
+    xhr.send(JSON.stringify({
+        name: name,
+        expires_days: expiresDays
+    }));
+}
+
+// Function to delete an API key
+function deleteApiKey(keyId, keyName) {
+    if (!confirm(`Are you sure you want to delete the API key "${keyName}"? This action cannot be undone.`)) {
+        return;
+    }
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('DELETE', '/api/keys/' + keyId, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.withCredentials = true;
+    
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
+                showAlert(`API key "${keyName}" has been deleted.`, 'success');
+                loadApiKeys();
+            } else {
+                console.error('Error deleting API key:', xhr.status, xhr.statusText);
+                showAlert('Failed to delete API key. Please try again.', 'danger');
+            }
+        }
+    };
+    
+    xhr.onerror = function() {
+        console.error('Network error deleting API key');
+        showAlert('Network error deleting API key', 'danger');
+    };
+    
+    xhr.send();
+}
+
+// Function to copy API key to clipboard
+async function copyApiKey() {
+    const apiKeyInput = document.getElementById('newApiKey');
+    try {
+        await navigator.clipboard.writeText(apiKeyInput.value);
+        showAlert('API key copied to clipboard!', 'success');
+    } catch (error) {
+        // Fallback for older browsers
+        apiKeyInput.select();
+        document.execCommand('copy');
+        showAlert('API key copied to clipboard!', 'success');
+    }
+}
+
+// Modal management functions
+function showCreateModal() {
+    document.getElementById('createKeyModal').classList.remove('hidden');
+    document.getElementById('createKeyModal').classList.add('flex');
+}
+
+function hideCreateModal() {
+    document.getElementById('createKeyModal').classList.add('hidden');
+    document.getElementById('createKeyModal').classList.remove('flex');
+}
+
+function showShowModal() {
+    document.getElementById('showKeyModal').classList.remove('hidden');
+    document.getElementById('showKeyModal').classList.add('flex');
+}
+
+function hideShowModal() {
+    document.getElementById('showKeyModal').classList.add('hidden');
+    document.getElementById('showKeyModal').classList.remove('flex');
+}
+
+// Utility functions
+function formatDate(dateString) {
+    return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, function (s) {
+        return {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[s];
+    });
+}
+
+function showAlert(message, type) {
+    // Create alert element
+    const alert = document.createElement('div');
+    alert.className = `fixed top-4 right-4 z-50 p-4 rounded-md shadow-lg transition-all duration-300 ${
+        type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' :
+        type === 'warning' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+        type === 'danger' ? 'bg-red-100 text-red-800 border border-red-200' :
+        'bg-blue-100 text-blue-800 border border-blue-200'
+    }`;
+    
+    alert.innerHTML = `
+        <div class="flex items-center">
+            <span>${escapeHtml(message)}</span>
+            <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-lg font-bold">&times;</button>
+        </div>
+    `;
+    
+    document.body.appendChild(alert);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (alert.parentElement) {
+            alert.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

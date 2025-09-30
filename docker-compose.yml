@@ -1,0 +1,82 @@
+# RedRat Proxy - Production Docker Compose Configuration
+# This setup uses relative paths and works for any user on any system.
+# No hardcoded paths - completely portable across different environments.
+# This project is designed to be used with a reverse proxy on the Docker host.
+# See the apache/redrat.conf file for an example reverse proxy configuration.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env
+    
+    # Production-only volumes (using relative paths - works for any user)
+    volumes:
+      # Mount configuration files (read-only)
+      - ./mysql_schema.sql:/app/mysql_schema.sql:ro
+      - ./docker-reset-admin.sh:/app/docker-reset-admin.sh:ro
+      
+      # Mount persistent data directories (read-write)
+      - ./data/uploads:/app/app/static/uploads:rw
+      - ./data/remote_images:/app/app/static/remote_images:rw
+      
+      # Mount logs directory for production logging (read-write)
+      - ./logs:/app/logs:rw
+    
+    # Using host networking for direct access to host services
+    network_mode: host
+    
+    # Production environment configuration (most values come from .env file)
+    environment:
+      # Database connection (from .env file)
+      - MYSQL_HOST=${MYSQL_HOST:-localhost}
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_USER=${MYSQL_USER:-redrat}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DB=${MYSQL_DB:-redrat_proxy}
+      
+      # Application settings (from .env file)
+      - PYTHONPATH=/app
+      - SECRET_KEY=${SECRET_KEY}
+      - REDRAT_XMLRPC_URL=${REDRAT_XMLRPC_URL:-http://localhost:8000/RPC2}
+      - UPLOAD_FOLDER=${UPLOAD_FOLDER:-app/static/uploads}
+      
+      # Production environment settings
+      - FLASK_DEBUG=False
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - FLASK_RUN_HOST=127.0.0.1
+      - FLASK_RUN_PORT=5000
+      
+      # Web configuration (from .env file)
+      - SERVER_NAME=${SERVER_NAME:-localhost:5000}
+      - APPLICATION_ROOT=${APPLICATION_ROOT:-/}
+      - PREFERRED_URL_SCHEME=${PREFERRED_URL_SCHEME:-http}
+    
+    # Production restart policy
+    restart: unless-stopped
+    
+    # Flask development server command (simpler for debugging)
+    command: bash -c "/app/docker-entrypoint-new.sh /app/venv/bin/python app.py"
+    
+    # Production resource limits (Docker Compose compatible)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    
+    # Health check for Flask development server
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Production logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"

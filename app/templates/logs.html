@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}System Logs | RedRat Proxy{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">System Logs</h1>
+        <div class="flex space-x-2">
+            <button id="btn-refresh" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition flex items-center">
+                <i class="fas fa-sync-alt mr-2"></i> Refresh
+            </button>
+            <button id="btn-clear" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition flex items-center">
+                <i class="fas fa-trash mr-2"></i> Clear Logs
+            </button>
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex space-x-4">
+                    <select id="filter-level" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">All Levels</option>
+                        <option value="DEBUG">Debug</option>
+                        <option value="INFO">Info</option>
+                        <option value="WARNING">Warning</option>
+                        <option value="ERROR">Error</option>
+                        <option value="CRITICAL">Critical</option>
+                    </select>
+                    <input type="text" id="search-logs" placeholder="Search logs..." class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="text-sm text-gray-500">
+                    <span id="log-count">0</span> entries
+                </div>
+            </div>
+        </div>
+        
+        <div class="max-h-96 overflow-y-auto bg-black text-green-400 font-mono text-sm">
+            <div id="log-container" class="p-4">
+                <div class="text-gray-500">Loading logs...</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const logContainer = document.getElementById('log-container');
+    const logCount = document.getElementById('log-count');
+    const filterLevel = document.getElementById('filter-level');
+    const searchInput = document.getElementById('search-logs');
+    const btnRefresh = document.getElementById('btn-refresh');
+    const btnClear = document.getElementById('btn-clear');
+
+    let allLogs = [];
+    let filteredLogs = [];
+
+    async function loadLogs() {
+        console.log('loadLogs() called');
+        try {
+            const response = await fetch('/api/logs?limit=200', {
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            console.log('Logs API response:', response);
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Logs data:', data);
+                if (data.success) {
+                    allLogs = data.logs || [];
+                    filteredLogs = [...allLogs];
+                    console.log('Loaded', allLogs.length, 'logs');
+                    renderLogs();
+                } else {
+                    console.error('Failed to load logs:', data.error);
+                    logContainer.innerHTML = '<div class="text-red-400">Error loading logs: ' + data.error + '</div>';
+                }
+            } else if (response.status === 401) {
+                window.location.href = '/login';
+            } else {
+                console.error('Failed to load logs:', response.statusText);
+                logContainer.innerHTML = '<div class="text-red-400">Error loading logs: ' + response.statusText + '</div>';
+            }
+        } catch (error) {
+            console.error('Error loading logs:', error);
+            logContainer.innerHTML = '<div class="text-red-400">Error loading logs: ' + error.message + '</div>';
+        }
+    }
+
+    function renderLogs() {
+        console.log('renderLogs() called with', filteredLogs.length, 'logs');
+        console.log('logCount element:', logCount);
+        console.log('logContainer element:', logContainer);
+        
+        if (logCount) {
+            logCount.textContent = filteredLogs.length;
+        }
+        
+        if (!logContainer) {
+            console.error('log-container element not found!');
+            return;
+        }
+        
+        if (filteredLogs.length === 0) {
+            logContainer.innerHTML = '<div class="text-gray-500">No logs found</div>';
+            return;
+        }
+
+        logContainer.innerHTML = filteredLogs.map(log => {
+            const time = log.timestamp || 'Unknown';
+            const levelClass = getLevelClass(log.level);
+            return `<div class="mb-1">
+                <span class="text-gray-400">[${time}]</span>
+                <span class="${levelClass}">[${log.level}]</span>
+                <span class="text-white">${escapeHtml(log.message)}</span>
+            </div>`;
+        }).join('');
+        
+        // Auto-scroll to bottom
+        logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    function getLevelClass(level) {
+        switch (level) {
+            case 'DEBUG': return 'text-blue-400';
+            case 'INFO': return 'text-green-400';
+            case 'WARNING': return 'text-yellow-400';
+            case 'ERROR': return 'text-red-400';
+            case 'CRITICAL': return 'text-red-600';
+            case 'RAW': return 'text-gray-300';
+            default: return 'text-white';
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function filterLogs() {
+        const levelFilter = filterLevel.value;
+        const searchTerm = searchInput.value.toLowerCase();
+
+        filteredLogs = allLogs.filter(log => {
+            const matchesLevel = !levelFilter || log.level === levelFilter;
+            const matchesSearch = !searchTerm || log.message.toLowerCase().includes(searchTerm);
+            return matchesLevel && matchesSearch;
+        });
+
+        renderLogs();
+    }
+
+    function clearLogs() {
+        if (confirm('Are you sure you want to clear all logs?')) {
+            allLogs = [];
+            filteredLogs = [];
+            renderLogs();
+        }
+    }
+
+    // Event listeners
+    btnRefresh.addEventListener('click', loadLogs);
+    btnClear.addEventListener('click', clearLogs);
+    filterLevel.addEventListener('change', filterLogs);
+    searchInput.addEventListener('input', filterLogs);
+
+    // Initial load
+    loadLogs();
+
+    // Auto-refresh every 30 seconds
+    setInterval(loadLogs, 30000);
+});
+</script>
+{% endblock %}
