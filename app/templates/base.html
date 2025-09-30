@@ -136,7 +136,6 @@
                 {% endif %}
             </nav>
             <div class="flex items-center space-x-4">
-                {% if user.is_admin %}
                 <span class="text-sm">{{ user.username }}</span>
                 <a href="/logout" class="text-sm hover:text-blue-200 transition">
                     <i class="fas fa-sign-out-alt"></i>
