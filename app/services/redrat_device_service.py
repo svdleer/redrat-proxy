@@ -40,9 +40,14 @@ class RedRatDeviceService:
                     connection_result = redrat_service.test_connection()
                     
                     if connection_result['success']:
-                        device.update_status('online', 
-                                           connection_result.get('device_info', {}).get('model'),
-                                           connection_result.get('device_info', {}).get('ports'))
+                        device_model_string = connection_result.get('device_info', {}).get('model')
+                        device_ports = connection_result.get('device_info', {}).get('ports')
+                        
+                        # Convert string device model to integer for database storage
+                        from app.app import device_model_to_int
+                        device_model = device_model_to_int(device_model_string)
+                        
+                        device.update_status('online', device_model, device_ports)
                         device_dict['last_status'] = 'online'
                         logger.debug(f"Status check: Device {device.name} is online")
                     else:
