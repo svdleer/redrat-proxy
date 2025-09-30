@@ -124,6 +124,9 @@
                 <a href="/admin/users" class="text-sm hover:text-blue-200 transition {% if request.path == '/admin/users' %}font-bold{% endif %}">
                     <i class="fas fa-users mr-1"></i> Users
                 </a>
+                <a href="/api-keys" class="text-sm hover:text-blue-200 transition {% if request.path == '/api-keys' %}font-bold{% endif %}">
+                    <i class="fas fa-key mr-1"></i> API Keys
+                </a>
                 <a href="/logs" class="text-sm hover:text-blue-200 transition {% if request.path == '/logs' %}font-bold{% endif %}">
                     <i class="fas fa-file-alt mr-1"></i> Logs
                 </a>
@@ -134,10 +137,6 @@
             </nav>
             <div class="flex items-center space-x-4">
                 {% if user.is_admin %}
-                <button onclick="showApiKeyModal()" class="text-sm hover:text-blue-200 transition">
-                    <i class="fas fa-key mr-1"></i> API Keys
-                </button>
-                {% endif %}
                 <span class="text-sm">{{ user.username }}</span>
                 <a href="/logout" class="text-sm hover:text-blue-200 transition">
                     <i class="fas fa-sign-out-alt"></i>

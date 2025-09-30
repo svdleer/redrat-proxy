@@ -1012,6 +1012,11 @@ def admin_remotes(user):
 def admin_users(user):
     return render_template('admin/users.html', user=user)
 
+@app.route('/api-keys')
+@login_required(admin_only=True)
+def api_keys_page(user):
+    return render_template('api_keys.html', user=user)
+
 @app.route('/admin/logs')
 @login_required(admin_only=True)
 def logs(user):
