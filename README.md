@@ -1,4 +1,10 @@
-# RedRat Proxy - Complete IR Remote Control Management System
+# RedR### Core Functionality
+- 🎮 **IR Remote Control Management** - Complete CRUD operations for remote controls and commands
+- 📤 **XML Import/Export** - Import and export XML files in RedRat/IRNetBox format
+- 🔌 **RedRat Device Integration** - Direct communication with RedRat hardware via XML-RPC
+- 📊 **Real-time Dashboard** - Live statistics, command history, and system monitoring
+- ⏱️ **Command Scheduling** - Schedule IR commands to run at specific times
+- 🔄 **Command Sequences** - Create and execute multi-command macrosy - Complete IR Remote Control Management System
 
 A modern, production-ready web application for managing IR remote controls through RedRat hardware devices. Features a comprehensive Flask-based backend with MySQL database, Docker containerization, and a responsive web interface.
 
@@ -161,24 +167,36 @@ curl -b cookies.txt http://localhost:5000/api/remotes
 
 ## 📤 XML Import/Export
 
-### Importing IRNetBox Files
+### Importing XML Files
 1. Navigate to Admin → Remotes
-2. Use "Upload IRNetBox Remote File" section
-3. Select your .txt file with IRNetBox format
-4. System automatically creates remotes and commands
+2. Use "Upload IRNetBox file" section
+3. Select your XML file with RedRat/IRNetBox format
+4. System automatically processes and creates remotes and commands
 
-### IRNetBox Format Example
-```
-Device Humax HDR-FOX T2
-
-POWER   DMOD_SIG   signal1 16 0000BE8C0117D900060C050C...
-GUIDE   MOD_SIG    8 050C050C050C050C050C050C050C...
-UP      MOD_SIG    8 050C050C050C050C050C050C050C...
+### XML Format Example
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<IRNetBox xmlns="http://www.redrat.co.uk/irnetbox">
+  <DeviceInfo>
+    <DeviceName>Humax HDR-FOX T2</DeviceName>
+    <Manufacturer>Humax</Manufacturer>
+    <DeviceType>SET_TOP_BOX</DeviceType>
+  </DeviceInfo>
+  <Commands>
+    <Command name="POWER">
+      <SignalData>...</SignalData>
+    </Command>
+    <Command name="GUIDE">
+      <SignalData>...</SignalData>
+    </Command>
+  </Commands>
+</IRNetBox>
 ```
 
 ### Export to XML
 - Use the web interface to export remotes to XML format
-- Compatible with other RedRat tools and systems
+- Compatible with RedRat tools and IRNetBox systems
+- Maintains signal integrity and device information
 
 ## 🔑 API Key Management
 
