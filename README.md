@@ -1,157 +1,308 @@
-# RedRat Proxy
+# RedRat Proxy - Complete IR Remote Control Management System
 
-A modern web dashboard for the RedRat IrNetBox - infrared remote control system.
+A modern, production-ready web application for managing IR remote controls through RedRat hardware devices. Features a comprehensive Flask-based backend with MySQL database, Docker containerization, and a responsive web interface.
 
-**This is a production-ready Docker deployment.**
+## 🚀 Key Features
 
-## Features
+### Core Functionality
+- 🎮 **IR Remote Control Management** - Complete CRUD operations for remote controls and commands
+- 📤 **XML Import/Export** - Import IRNetBox format files and export to XML
+- � **RedRat Device Integration** - Direct communication with RedRat hardware via XML-RPC
+- 📊 **Real-time Dashboard** - Live statistics, command history, and system monitoring
+- ⏱️ **Command Scheduling** - Schedule IR commands to run at specific times
+- 🔄 **Command Sequences** - Create and execute multi-command macros
 
-- 🔒 Secure login system
-- 📱 Responsive UI built with Tailwind CSS
-- 🎮 Manage remote controls
-- 📊 Command history tracking
-- 🔍 Remote XML file management
-- 👥 User management with admin controls
-- 📤 XML Import for remotes and signals
-- 🐳 Production Docker deployment with Gunicorn
+### Security & Authentication
+- � **Dual Authentication** - Session-based login + API key authentication
+- 👑 **Admin Controls** - Role-based access with admin-only features
+- � **API Key Management** - Complete API key lifecycle with usage tracking
+- 🛡️ **Secure Sessions** - Encrypted session management with expiration
 
-## Enhanced Features
+### API & Integration
+- 📡 **RESTful API** - Comprehensive REST API for all operations
+- � **Swagger Documentation** - Interactive API documentation
+- 🔑 **API Authentication** - Support for Bearer tokens and API keys
+- 📊 **Activity Logging** - Complete audit trail of all operations
 
-- ⏱️ **Command Scheduler**: Schedule IR commands to run at specific times
-- 🔄 **Command Sequences**: Queue multiple commands in a row and save as reusable macros
-- 📊 **Visual Dashboard**: Monitoring interface for command execution status
-- 📱 **Direct Control Interface**: Send immediate IR commands to devices
-- 📋 **Command Templates**: Create templates from XML files for quick access
-- 📊 **Signal Visualization**: View visual representations of IR signal patterns
-- 📤 **XML Import**: Import remotes from RedRat XML files
+### Technical Excellence
+- 🐳 **Docker Ready** - Complete containerization with Docker Compose
+- 💾 **MySQL Database** - Robust relational database with proper constraints
+- � **Health Monitoring** - Built-in health checks and logging
+- 🔧 **Production Ready** - Gunicorn WSGI server with resource limits
 
-## Dashboard
+## 🏗️ System Architecture
 
-The RedRat Proxy features a modern dashboard built with Tailwind CSS that includes:
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Web Frontend  │────│   Flask API     │────│   MySQL DB      │
+│  (HTML/JS/CSS)  │    │   (Python)      │    │  (Data Layer)   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                              │
+                              ▼
+                       ┌─────────────────┐
+                       │   RedRat Device │
+                       │   (XML-RPC)     │
+                       └─────────────────┘
+```
 
-- 📊 **Stats Overview**: Real-time counts of remotes, commands, sequences, and schedules
-- 🎮 **Quick Command**: Send IR commands directly from the dashboard
-- 📜 **Recent Commands**: View recent command history with status
-- 📱 **Activity Feed**: Real-time feed of command executions and user actions
+### Database Schema
+- **Users** - Authentication and authorization
+- **API Keys** - API authentication with usage tracking
+- **Remotes** - IR remote control definitions
+- **Commands** - Individual IR commands with signal data
+- **Sequences** - Multi-command macros
+- **Schedules** - Timed command execution
+- **Templates** - Reusable command templates
+- **Activity Logs** - Complete audit trail
 
-## Remote Management
+## 🚀 Quick Start
 
-### IRNetBox Import for Remotes
+### Prerequisites
+- Docker and Docker Compose
+- MySQL server (local or containerized)
+- RedRat IR hardware device (optional for development)
 
-The system supports importing remote controls and their signals from IRNetBox format txt files. This replaces the previous XML import system and provides better compatibility with RedRat signal data.
+### Installation
 
-#### IRNetBox Format Structure
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/svdleer/redrat-proxy.git
+   cd redrat-proxy
+   ```
 
-The import system supports the standard IRNetBox format:
+2. **Setup environment**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
 
+3. **Initialize database**
+   ```bash
+   mysql -h localhost -u root -p < mysql_schema.sql
+   ```
+
+4. **Start the application**
+   ```bash
+   docker-compose up -d
+   ```
+
+5. **Access the application**
+   - Web Interface: http://localhost:5000
+   - API Documentation: http://localhost:5000/swagger
+   - Default Login: admin/admin
+
+## 🔧 Configuration
+
+### Environment Variables (.env)
+```bash
+# MySQL Configuration
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_DB=redrat_proxy
+MYSQL_USER=redrat
+MYSQL_PASSWORD=your_password
+
+# Application Settings
+SECRET_KEY=your_secret_key
+UPLOAD_FOLDER=app/static/uploads
+LOG_LEVEL=INFO
+
+# RedRat Device
+REDRAT_XMLRPC_URL=http://your-redrat-ip:40000/RPC2
+
+# Web Server
+SERVER_NAME=localhost:5000
+APPLICATION_ROOT=/
+PREFERRED_URL_SCHEME=http
+```
+
+### Docker Compose Features
+- **Host networking** for optimal RedRat device communication
+- **Health checks** with automatic restart policies
+- **Volume mounts** for persistent data and logs
+- **Resource limits** for production stability
+
+## 📡 API Usage
+
+### Authentication
+The API supports two authentication methods:
+
+**1. API Key Authentication**
+```bash
+# Using Authorization header
+curl -H "Authorization: Bearer rr_your_api_key_here" \
+     http://localhost:5000/api/remotes
+
+# Using X-API-Key header
+curl -H "X-API-Key: rr_your_api_key_here" \
+     http://localhost:5000/api/remotes
+```
+
+**2. Session Authentication**
+```bash
+# Login to get session cookie
+curl -c cookies.txt -X POST \
+     -H "Content-Type: application/json" \
+     -d '{"username":"admin","password":"admin"}' \
+     http://localhost:5000/api/login
+
+# Use session cookie for subsequent requests
+curl -b cookies.txt http://localhost:5000/api/remotes
+```
+
+### Key Endpoints
+- `GET /api/remotes` - List all remotes
+- `POST /api/remotes` - Create new remote
+- `GET /api/commands` - List commands
+- `POST /api/commands` - Execute IR command
+- `GET /api/sequences` - List sequences
+- `POST /api/sequences` - Create/execute sequence
+- `GET /api/keys` - Manage API keys (admin only)
+
+## 📤 XML Import/Export
+
+### Importing IRNetBox Files
+1. Navigate to Admin → Remotes
+2. Use "Upload IRNetBox Remote File" section
+3. Select your .txt file with IRNetBox format
+4. System automatically creates remotes and commands
+
+### IRNetBox Format Example
 ```
 Device Humax HDR-FOX T2
 
-Signal data as IRNetBox data blocks
-
-POWER   DMOD_SIG   signal1 16 0000BE8C0117D900060C050C050C050C050C050C050C050C050C050C050C050C050C050C...
-POWER   DMOD_SIG   signal2 16 0000BE8C0117D900060C050C050C050C050C050C050C050C050C050C050C050C050C050C...
-GUIDE   MOD_SIG    8 050C050C050C050C050C050C050C050C050C050C050C050C050C050C050C050C...
-UP      MOD_SIG    8 050C050C050C050C050C050C050C050C050C050C050C050C050C050C050C050C...
+POWER   DMOD_SIG   signal1 16 0000BE8C0117D900060C050C...
+GUIDE   MOD_SIG    8 050C050C050C050C050C050C050C...
+UP      MOD_SIG    8 050C050C050C050C050C050C050C...
 ```
 
-#### Importing IRNetBox Files
+### Export to XML
+- Use the web interface to export remotes to XML format
+- Compatible with other RedRat tools and systems
 
-1. Navigate to the Admin > Remotes page
-2. Use the "Upload IRNetBox Remote File" panel to select and upload your .txt file
-3. The system will process the file and create or update remotes in the database
-4. Signal data will be saved as command templates, making them available for use in commands and sequences
+## 🔑 API Key Management
 
-#### Database Schema for Remotes
+### Features
+- **Last Used Tracking** - See when each API key was last used
+- **Expiration Management** - Set custom expiration dates
+- **Admin Only Access** - Only administrators can manage API keys
+- **Usage Monitoring** - Track API key usage patterns
 
-The database is structured to store all relevant information from the XML file:
+### Creating API Keys
+1. Login as admin
+2. Navigate to API Keys page
+3. Click "Create New API Key"
+4. Set name and expiration
+5. Copy the generated key (shown only once!)
 
-```sql
-CREATE TABLE remotes (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    manufacturer VARCHAR(255),
-    device_model_number VARCHAR(255),
-    remote_model_number VARCHAR(255),
-    device_type VARCHAR(255),
-    decoder_class VARCHAR(255),
-    description TEXT,
-    image_path VARCHAR(255),
-    config_data JSON,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
+## 📊 Monitoring & Logging
 
-The `config_data` field stores additional configuration parameters from the XML as a JSON object.
+### Dashboard Metrics
+- Total remotes, commands, sequences
+- Recent command history
+- System activity feed
+- Real-time execution status
 
-### Command Templates
+### Logging
+- **Application logs** - All system events and errors
+- **Command execution** - IR command success/failure
+- **API usage** - Request logging with authentication
+- **Database operations** - Query and transaction logs
 
-When importing remotes from IRNetBox format files, the system automatically creates command templates for each signal. These templates are used to send commands to the RedRat IrNetBox.
+## 🔧 Development
 
-Note: XML import has been replaced with IRNetBox format imports for better signal compatibility.
-
-## Installation & Deployment
-
-This project is configured for production deployment using Docker. For complete setup instructions, see:
-
-- **[DOCKER_SETUP.md](DOCKER_SETUP.md)** - Complete Docker setup guide
-- **[DOCKER_TROUBLESHOOTING.md](DOCKER_TROUBLESHOOTING.md)** - Common issues and solutions
-- **[REDRAT_DEBUGGING.md](REDRAT_DEBUGGING.md)** - Comprehensive debugging guide for RedRat communication
-- **[SCHEDULER_README.md](SCHEDULER_README.md)** - Scheduler configuration
-
-### Service Cache Reset
-
-If you encounter "No template found" errors in production, you may need to reset the RedRat service cache:
-
+### Local Development Setup
 ```bash
-# For Linux/macOS production
-python reset_service_cache.py
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
 
-# For Windows production
-reset_service_cache.bat
+# Install dependencies
+pip install -r requirements.txt
+
+# Run development server
+python app.py
 ```
 
-This is typically needed after database schema changes or when the service instance becomes stale.
-
-### Quick Start
-
+### Database Migrations
 ```bash
-# 1. Clone and setup
-git clone <repository>
-cd redrat-proxy
-cp .env.example .env
-# Edit .env with your production settings
+# Reset database (WARNING: destroys data)
+mysql -h localhost -u redrat -p'password' redrat_proxy < mysql_schema.sql
 
-# 2. Setup database
-mysql -u root -p < mysql_schema.sql
-
-# 3. Build and run (production)
-docker-compose build
-docker-compose up -d
-
-# 4. Access application
-curl http://localhost:5000
+# Backup before changes
+mysqldump -h localhost -u redrat -p'password' redrat_proxy > backup.sql
 ```
 
-### Available Commands
+## 🐳 Production Deployment
 
-Use the included Makefile for common operations:
+### Docker Production Features
+- **Gunicorn WSGI server** for high performance
+- **Health checks** with automatic recovery
+- **Resource limits** (1 CPU, 512MB RAM)
+- **Log rotation** with size limits
+- **Non-root execution** for security
 
+### Scaling Considerations
+- Database connection pooling included
+- Stateless design allows horizontal scaling
+- Redis can be added for session storage
+- Load balancer compatible
+
+## 🛠️ Troubleshooting
+
+### Common Issues
+
+**Container won't start:**
 ```bash
-make help      # Show all available commands
-make build     # Build Docker image
-make up        # Start production containers
-make down      # Stop containers
-make logs      # View logs
-make backup    # Backup database
-make clean     # Clean up resources
+# Check logs
+docker-compose logs web
+
+# Rebuild without cache
+docker-compose build --no-cache
 ```
 
-## Production Features
+**Database connection errors:**
+```bash
+# Test database connectivity
+mysql -h localhost -u redrat -p'password' redrat_proxy
 
-- **Gunicorn WSGI server** for production performance
-- **Resource limits** and health checks
-- **Structured logging** with log rotation
-- **Database backups** with retention policies
-- **Security hardening** with non-root user
-- **Host networking** for optimal performance
+# Check database schema
+SHOW TABLES;
+```
+
+**RedRat device not responding:**
+```bash
+# Test XML-RPC connection
+curl http://your-redrat-ip:40000/RPC2
+
+# Check device configuration in .env
+```
+
+### Support Files
+- `docker-reset-admin.sh` - Reset admin password
+- `generate_admin_password.py` - Generate password hashes
+- Log files in `./logs/` directory
+
+## 📝 License
+
+This project is proprietary software. All rights reserved.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## 📞 Support
+
+For technical support or questions:
+- Check the logs in `./logs/`
+- Review the API documentation at `/swagger`
+- Ensure all environment variables are properly set
+- Verify RedRat device connectivity
+
+---
+
+**RedRat Proxy** - Professional IR Remote Control Management System
